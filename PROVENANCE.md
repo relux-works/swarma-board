@@ -91,3 +91,41 @@ They do not establish HTTP, storage atomicity, graph, CLI, archive-security or
 production qualification. P1–P4 and integrated P5 acceptance remain real work.
 Production auth U1, real sanitized snapshot custody, independent Muse review,
 required checks, signed landing and owner cutover authorization remain held.
+
+## P5 composition delta
+
+P5 producer agents2_swarma_dev3 composes its own isolated clone from signed P0
+6a0b65cc88787117ace16ba59a2560d70af63461, with exact immutable P2
+ afe86ab441251acd23e5ce666527765f3b7507bc, P3
+6001a5d77849c12d14a9814c1cc21d5e2972c2b1 and P4
+4b4280896dca518aa9223eff63b8eba9e4110c20. Their original commits and source
+attribution remain intact. P5 writes only its assigned shared module, contract,
+app/cmd/integration and provenance paths. P3's proposed pflag v1.0.9 indirect
+module declaration is applied centrally; existing go.sum suffices.
+
+The original P0 architecture hashes above describe the immutable baseline.
+P5 appends approved D6 semantics and updates companion decision/ownership/task
+records under the root assignment's Meta+lead agreement. No upstream platform
+API is claimed. P5 consulted the orchestrator's specification for acceptance
+coverage; its historical proposed status does not supersede the frozen contract.
+
+D6 requires production Unix kernel identity and remoteTLS, append-only task
+journal plus separately signed export, Host service lifecycle/deadservice
+refusal, and fresh read-only rollback preservation. These production follow-ups
+are explicitly gated; current loopback HTTP and verified test TLS are synthetic
+qualification only. Existing schema-v1 audit lacks the new journal digest and
+must not be silently reinterpreted. No UID mapping, signer custodian, bot-key
+reuse, production adapter, real import or source cutover is inferred.
+
+P5 never fetches or modifies source product code/live data; LICENSE/NOTICE and
+shared synthetic fixtures stay byte-identical to P0. No independent review,
+main landing, push, production deployment or external notification is performed.
+Original tb-keeper notification/disposition belongs to root before adoption.
+
+Completed P1 was consumed only after its final receipt at
+2026-11-05T15:53:08Z: signed head d73e16961f4b10d4806b8b128194d8c64989909c,
+bundle SHA256 ef658dfec6f4ebf6d5acb78fbda3b5e49a526d112ad497e97418c95da7002ba2.
+Exact constructors are query.New(), domain.New(repository, clock, ID generator)
+and domain.RandomID(type, time). P5 delegates ID generation to that helper and
+retains domain collision checks inside the transaction. No unfinished/floating
+P1 code or another identity's credential was consumed.
