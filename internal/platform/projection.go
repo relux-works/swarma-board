@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/relux-works/swarma-board/internal/client"
@@ -80,6 +81,12 @@ func Synthetic(ctx context.Context, path string, fd *os.File) (contract.Projecti
 	p, err := Projection(f)
 	if err != nil {
 		return nil, nil, err
+	}
+	// The synthetic bearer-fd harness is TCP-only. Unix composition injects
+	// a socket transport and must never resolve or consume a bearer.
+	selected, err := p.Resolve(ctx)
+	if err != nil || strings.HasPrefix(selected.Endpoint, "unix:") {
+		return nil, nil, client.LocalError("invalid_request", "Unix mode does not accept synthetic bearer credentials")
 	}
 	c, err := testadapter.CredentialFromFile(ctx, fd)
 	if err != nil {

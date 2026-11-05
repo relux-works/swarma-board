@@ -21,8 +21,12 @@ type Options struct {
 	Projection contract.ProjectionSource
 	Credential contract.CredentialSource
 	TLSConfig  *tls.Config
-	Commit     string
-	Out, Err   io.Writer
+	// UnixTransport is explicitly bound to Projection's endpoint. SyntheticHTTP
+	// is an opt-in for harnesses only; production composition leaves it false.
+	UnixTransport *client.UnixTransport
+	SyntheticHTTP bool
+	Commit        string
+	Out, Err      io.Writer
 }
 
 func local(message string) error { return client.LocalError("invalid_request", message) }
@@ -51,6 +55,7 @@ func NewCommand(o Options) *cobra.Command {
 	root.PersistentFlags().IntVar(&fd, "synthetic-credential-fd", -1, "Explicit synthetic bearer fd (consumed once and closed)")
 	connect := func(cmd *cobra.Command) (*client.Client, error) {
 		p, c := o.Projection, o.Credential
+		syntheticHTTP := o.SyntheticHTTP
 		fixtureSet := root.PersistentFlags().Changed("synthetic-projection")
 		fdSet := root.PersistentFlags().Changed("synthetic-credential-fd")
 		if fixtureSet || fdSet {
@@ -63,11 +68,12 @@ func NewCommand(o Options) *cobra.Command {
 			if err != nil {
 				return nil, err
 			}
+			syntheticHTTP = true
 			if _, err = io.WriteString(o.Err, "synthetic fixture mode\n"); err != nil {
 				return nil, local("cannot write mode notice")
 			}
 		}
-		return client.New(cmd.Context(), p, c, client.Options{TLSConfig: o.TLSConfig})
+		return client.New(cmd.Context(), p, c, client.Options{TLSConfig: o.TLSConfig, UnixTransport: o.UnixTransport, SyntheticHTTP: syntheticHTTP})
 	}
 	emit := func(v any) error {
 		enc := json.NewEncoder(o.Out)
