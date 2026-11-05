@@ -145,3 +145,23 @@ per-agent isolation, production adapter, remote custody or signed audit-export
 qualification is inferred. Existing audit schema stays unchanged, its migration
 remains HELD, and maintenance-package ownership remains with dev15. Original
 49931945 candidate/output remain immutable; transport evidence is separate.
+
+Offline maintenance successor continues exact transport head
+352aedf5acac1ee058a36c26befe7916aa48186f and imports only the four unchanged
+`internal/maintenance` files from dev15's completed signed component
+37d189daecdeb98c862925c44c02f4acdf82bc20. Its frozen P2 successor and P4 bases
+match this composition. The completed result, bundle and integration contract
+are copied into a separate immutable handoff input directory; no moving peer
+worktree is consumed or written. All P1/P2/P3/P4/shared package bytes remain
+unchanged. P5 owns app dispatch, private no-replace publication, CLI process
+qualification and documentation. Dev15 retains maintenance-package authorship.
+
+Only synthetic temporary databases are used. Schema-v1 remains unchanged; no
+v2 history, signature authority, keys, production Source APIs or protected
+identity policy is invented. The CLI records an unsigned manifest with exact
+build identity, coherent snapshot/journal hashes and v1 revision range. Git SSH
+signatures apply only to local source candidates. Meta196 removes the Swarma
+authorship hold; task-specific Source custody, Curator key hold, independent
+Muse review/checks and authorized signed landing remain pending. Existing
+output and output-transport-r2 artifacts are preserved byte-for-byte, with this
+successor's evidence in output-maintenance-r3. No push or live activation occurs.

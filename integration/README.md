@@ -81,5 +81,67 @@ algorithm and custody; authorized sanitized data, source notification dispositio
 and cutover/reconciliation authority. Schema-v1 bytes are preserved; version,
 project and digest-bearing persistence remain HELD. `internal/maintenance/**`
 belongs to the independent maintenance producer and is not implemented here.
-Independent Muse review/checks and authorized signed landing remain required;
-Meta A/B main-author and task-specific Curator key holds remain unchanged.
+Independent Muse review/checks and authorized signed landing remain required.
+Meta196 removed the Swarma authorship hold; the task-specific Source gate and
+Curator key hold remain in effect.
+
+### Offline maintenance command (unsigned synthetic qualification)
+
+The explicit server-only entry dispatches before registry, fixture, auth,
+listener or service initialization:
+
+```sh
+swarma-board-server maintenance-export \
+  --database /absolute/private/source.db --project synthetic-board \
+  --output /absolute/private-evidence/new-checkpoint --writer-stopped
+```
+
+The binary must be built with `-ldflags '-X main.commit=<full-40-hex-commit>'`.
+There are no ambient database, project, signer or credential defaults. The Host
+must already stop the writer and retain maintenance ownership excluding service
+restart and source/output path replacement through publication. The flag is an
+assertion of that ownership, not proof or an operation that stops the service.
+The inherited read-only bbolt lock additionally refuses an active writer after
+about two seconds; cancellation cannot shorten lock acquisition. No board CLI
+fallback, HTTP route, stop, spawn, restore or resume operation is added.
+
+`internal/maintenance` is consumed byte-for-byte from dev15's completed signed
+`37d189daecdeb98c862925c44c02f4acdf82bc20`. It reads a single coherent schema-v1
+ExportView and closes its read-only handle after encoding. App composition then
+validates canonical manifest/journal bytes, native-v1 content and exact sizes and
+SHA256 hashes. The source database is never created, initialized or migrated.
+The native snapshot and full v1 audit journal are separate artifacts; v1 events
+are not replayable and no historical change digest or v2 fields are invented.
+
+Output requires an absolute new directory beneath an existing canonical private
+0700 parent protected by the Host, including its ancestors. Publication stages
+the exact three streams privately (0700 directory, 0600 exclusive regular files),
+syncs files and directory, then uses Linux amd64 `renameat2(RENAME_NOREPLACE)`
+relative to the retained parent descriptor and syncs the parent. Existing files,
+directories and symlinks refuse; unsupported no-replace operations fail closed.
+There is no overwrite-capable rename fallback. Other platforms are unqualified.
+This filesystem code is a producer candidate pending independent Muse review;
+fault/power-loss recovery has not been qualified. Process death can leave private
+`.maintenance-incomplete-*` staging; the Host owns inspection/retention. A parent
+sync failure after rename returns failure even though a complete output may be
+visible. Inspect it before retrying; no completion is reported for partial writes.
+
+The manifest and completion message say **unsigned**. No signature is written,
+signer selected, key read or approval inferred from a candidate's Git signature.
+The CLI does not expose the package's external-signing seams until the owners
+approve signer identity, trust, algorithm/format and custody policy. Artifact
+hashes establish self-consistency only. The maintenance manifest binds snapshot
+and journal; its own exact-byte SHA256 can be recorded separately in the review
+packet. The source writer stays stopped after every exit.
+
+`TestMaintenanceExecutableUnsignedReadOnlyReimportAndRefusal` builds and runs the
+actual command over synthetic temporary state containing a post-checkpoint task
+mutation. It verifies source bytes/inode/mtime, complete revision-2 journal and
+manifest hashes, checks native reimport into a fresh synthetic target, and checks
+busy-writer, missing assertion/source, uninitialized source, symlink, mixed flags,
+wrong project and occupied output refusals. Native reimport starts a new local
+revision-1 audit history; it never replays the exported journal or resumes the
+source. Existing actual Unix/TLS integration tests continue unchanged. These
+witnesses do not qualify a production source, signature, UID policy or cutover.
+Artifact limits are inherited from dev15 and frozen P2/P4; they do not provide a
+total process-memory bound or a raw-state preallocation bound.

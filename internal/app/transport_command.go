@@ -15,11 +15,14 @@ import (
 	"github.com/relux-works/swarma-board/internal/contract"
 )
 
-// RunServer exposes explicit synthetic qualification only. Production startup,
-// protected mapping custody and maintenance export remain separate gated work.
+// RunServer dispatches offline maintenance before any synthetic service setup.
+// Production startup and protected mapping custody remain gated.
 func RunServer(ctx context.Context, args []string, commit string, out io.Writer) (exit int) {
 	if out == nil {
 		out = os.Stderr
+	}
+	if len(args) > 0 && args[0] == "maintenance-export" {
+		return runMaintenanceExport(ctx, args[1:], commit, out)
 	}
 	transport := false
 	for _, a := range args {

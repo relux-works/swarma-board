@@ -269,6 +269,24 @@ TCP. These concrete APIs supersede F1's proposed constructor names only.
 `store.AuditEvent` currently aliases existing v1 `AuditRecord`. `ExportView`
 returns coherent bounded v1 events, not the proposed digest-bearing v2 journal.
 Schema migration remains HELD; no missing historical fields are invented. The
-maintenance/export producer and external signing custody are separate work.
+maintenance/export producer owns its separate package; external signing custody
+remains pending.
 New synthetic transport tests cannot satisfy distinct-UID T1, full v2 T4,
 approved-signer T5, production adoption or T6 cutover requirements.
+
+### Offline maintenance implementation status
+
+Completed dev15 component `37d189daecdeb98c862925c44c02f4acdf82bc20` is integrated
+unchanged. Server `maintenance-export` dispatches before service initialization,
+requires an explicit existing database, project, new private output directory,
+exact build commit and Host stopped-writer assertion, and uses only read-only
+export plus structural/hash verification. It publishes three exact detached
+streams via private staging and Linux amd64 atomic no-replace publication.
+Host maintenance ownership must exclude restart and path replacement beyond the
+database handle lifetime; a read-only bbolt lock also excludes an active writer.
+No service stop/spawn/resume, local client fallback, public maintenance route,
+schema initialization or implicit migration is added. The checkpoint stays
+unsigned. No protected signer policy is configured or inferred. Synthetic CLI
+export/reimport and contention witnesses do not close production signer, UID,
+Source custody, filesystem crash-recovery or cutover gates. See integration
+README for publication failure semantics and inherited resource limits.
