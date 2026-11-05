@@ -309,5 +309,26 @@
     "production adapter implementation/adoption",
     "G2"
   ],
-  "deferred_followup": "New product skill after accepted interface/dogfood; no copied legacy usage instructions or artificial task inflation."
+  "deferred_followup": "New product skill after accepted interface/dogfood; no copied legacy usage instructions or artificial task inflation.",
+  "approved_semantic_delta": {
+    "contract": "contract.md D6",
+    "authority": "Meta+lead agreement reported in root P5 assignment",
+    "implementation": "synthetic current; follow-up server/client/root assignments in immutable output/contract-delta.md",
+    "gates": [
+      "Host UID/runtime/mapping",
+      "U1 accepted adapter pin",
+      "remote TLS/auth custody",
+      "explicit journal schema disposition",
+      "external signer trust/custody",
+      "real snapshot/notification/cutover authority"
+    ],
+    "acceptance": [
+      "T1",
+      "T2",
+      "T3",
+      "T4",
+      "T5",
+      "T6"
+    ]
+  }
 }

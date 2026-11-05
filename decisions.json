@@ -74,6 +74,13 @@
         "tools/board-server/internal/api/router.go:93-109"
       ],
       "owner_landing_authorized": false
+    },
+    {
+      "id": "D6",
+      "title": "Kernel local identity, remoteTLS, task journal and read-only rollback",
+      "state": "semantic-scope-agreed-by-meta-and-lead-per-P5-root-assignment; production qualification pending",
+      "decision": "contract.md D6 overrides earlier production transport/Bearer language. HTTP remains synthetic. No new shared Go interfaces. Journal v2 disposition and external signer/Host/U1 remain gated.",
+      "owner_landing_authorized": false
     }
   ],
   "counterproposals": [
@@ -107,6 +114,10 @@
     "destination": "Orchestrator supplies private relux-works/swarma-board repository and base; architect does not create/publish.",
     "real_data": "Owner-authorized sanitized snapshot/digest/mapping/custody/resources required before real adoption.",
     "landing": "Independent Muse muse-wonder-full-1.0-contributor xhigh review, required checks and authorized signed owner landing.",
-    "cutover": "Separate source-owner writer switch/remote deployment authorization."
+    "cutover": "Separate source-owner writer switch/remote deployment authorization.",
+    "Host": "Protected UID mapping/grants, distinct UIDs and runtime/socket service contract required.",
+    "audit_schema": "Existing v1 lacks digest/version/project; explicit v2/new-project disposition required before persistent change.",
+    "signer": "External custodian/key/trust anchor/algorithm/custody required; bot signing key never inferred.",
+    "rollback": "Fresh post-cutover checkpoint read-only; old writer separately reconciled/authorized."
   }
 }

@@ -55,7 +55,7 @@
         "internal/httpapi/**",
         "internal/auth/**"
       ],
-      "responsibility": "Storm transaction Repository, project leases, HTTP boundary/error/ETag/auth checks, readiness; Authorizer local adapter compatible. No bootstrap token printing or real source credential reads."
+      "responsibility": "Storm transaction Repository, project leases, HTTP boundary/error/ETag/auth checks, readiness; Authorizer local adapter compatible. No bootstrap token printing or real source credential reads. D6: package-local PeerAuthenticator, kernel connection identity, per-request mapping/grants, journal schema proposal and bounded coherent read-only ExportView. Host mapping contract is external."
     },
     {
       "owner": "client-cli-producer",
@@ -64,7 +64,7 @@
         "internal/cli/**",
         "internal/platform/**"
       ],
-      "responsibility": "Cobra product CLI, HTTP transport/preflight/revision behavior, narrow injected projection/credential seam, no ambient fallback or service autostart."
+      "responsibility": "Cobra product CLI, HTTP transport/preflight/revision behavior, narrow injected projection/credential seam, no ambient fallback or service autostart. D6: Unix scheme/dial seam and credential bypass, remote verified TLS, dead-service Host guidance. No service launch."
     },
     {
       "owner": "transfer-producer",
@@ -138,5 +138,6 @@
     "internal/app": [
       "all concrete packages for explicit composition only"
     ]
-  }
+  },
+  "followup_contract": "contract.md D6; root handoff output/contract-delta.md"
 }
