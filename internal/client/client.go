@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -27,11 +26,17 @@ const (
 	MaxQuery   = 8 << 20
 )
 
-// Options permits explicit trust roots for verified TLS. No insecure mode or
-// arbitrary RoundTripper is exposed; redirects, proxies and retries stay owned.
-type Options struct{ TLSConfig *tls.Config }
+// Options contains explicit composition inputs. UnixTransport must be created
+// for the selected endpoint by NewUnixTransport; it is never selected implicitly.
+// SyntheticHTTP permits literal-loopback HTTP only in an explicit test harness.
+type Options struct {
+	TLSConfig     *tls.Config
+	UnixTransport *UnixTransport
+	SyntheticHTTP bool
+}
 type Client struct {
 	projection contract.Projection
+	origin     string
 	token      string
 	http       *http.Client
 	version    Version
@@ -57,22 +62,32 @@ var projectID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 var commitPattern = regexp.MustCompile(`^(dev|[0-9a-f]{40})$`)
 var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
 
-// ValidateProjection accepts an origin only, with an optional final slash.
+// ValidateProjection accepts a Unix socket endpoint or a TCP origin. HTTP is
+// structurally accepted here; New additionally requires explicit synthetic mode.
 func ValidateProjection(p contract.Projection) error {
 	u, err := url.Parse(p.Endpoint)
-	if err != nil || u == nil || u.Opaque != "" || u.User != nil || u.Host == "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.RawFragment != "" || u.RawPath != "" || (u.Path != "" && u.Path != "/") || strings.Contains(p.Endpoint, "#") {
+	if err != nil || u == nil {
 		return LocalError("invalid_request", "invalid endpoint origin")
 	}
-	if u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "127.0.0.1" || u.Hostname() == "::1")) {
-		return LocalError("invalid_request", "endpoint requires verified HTTPS or literal-loopback HTTP")
-	}
-	if strings.HasSuffix(u.Host, ":") {
-		return LocalError("invalid_request", "invalid endpoint port")
-	}
-	if port := u.Port(); port != "" {
-		n, e := strconv.Atoi(port)
-		if e != nil || n < 1 || n > 65535 {
+	if u.Scheme == "unix" {
+		if _, err := unixSocketPath(p.Endpoint); err != nil {
+			return err
+		}
+	} else {
+		if u.Opaque != "" || u.User != nil || u.Hostname() == "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.RawFragment != "" || u.RawPath != "" || (u.Path != "" && u.Path != "/") || strings.Contains(p.Endpoint, "#") {
+			return LocalError("invalid_request", "invalid endpoint origin")
+		}
+		if u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "127.0.0.1" || u.Hostname() == "::1")) {
+			return LocalError("invalid_request", "endpoint requires Unix socket, verified HTTPS or synthetic literal-loopback HTTP")
+		}
+		if strings.HasSuffix(u.Host, ":") {
 			return LocalError("invalid_request", "invalid endpoint port")
+		}
+		if port := u.Port(); port != "" {
+			n, e := strconv.Atoi(port)
+			if e != nil || n < 1 || n > 65535 {
+				return LocalError("invalid_request", "invalid endpoint port")
+			}
 		}
 	}
 	if !projectID.MatchString(p.ProjectID) || p.AccountID == "" || len(p.AccountID) > 256 || !utf8.ValidString(p.AccountID) || strings.ContainsFunc(p.AccountID, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
@@ -81,10 +96,11 @@ func ValidateProjection(p contract.Projection) error {
 	return nil
 }
 
-// New resolves one projection, then one credential, and completes version and
-// account preflight before returning a usable project client.
+// New resolves one projection and completes version/account preflight. Unix
+// mode never calls CredentialSource; TCP modes resolve exactly one credential.
+// Close releases idle connections, including those in the injected transport.
 func New(ctx context.Context, projections contract.ProjectionSource, credentials contract.CredentialSource, options Options) (*Client, error) {
-	if projections == nil || credentials == nil {
+	if projections == nil {
 		return nil, LocalError("invalid_request", "projection and credential adapters are required")
 	}
 	p, err := projections.Resolve(ctx)
@@ -94,25 +110,40 @@ func New(ctx context.Context, projections contract.ProjectionSource, credentials
 	if err = ValidateProjection(p); err != nil {
 		return nil, err
 	}
-	token, err := credentials.Bearer(ctx, p)
-	if err != nil || token == "" || len(token) > 4096 || !utf8.ValidString(token) || strings.ContainsFunc(token, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
-		return nil, LocalError("invalid_request", "credential resolution failed")
-	}
-	tr := &http.Transport{
-		DialContext:       (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		ForceAttemptHTTP2: true, MaxIdleConns: 16, IdleConnTimeout: 90 * time.Second,
-		TLSHandshakeTimeout: 10 * time.Second, ExpectContinueTimeout: time.Second,
-		ResponseHeaderTimeout: 125 * time.Second, MaxResponseHeaderBytes: 32 << 10,
-	}
-	if options.TLSConfig != nil {
-		t := options.TLSConfig.Clone()
-		if t.InsecureSkipVerify {
-			return nil, LocalError("invalid_request", "TLS verification is required")
+	u, _ := url.Parse(p.Endpoint)
+	var token string
+	var tr http.RoundTripper
+	origin := strings.TrimSuffix(p.Endpoint, "/")
+	if u.Scheme == "unix" {
+		if options.UnixTransport == nil || options.UnixTransport.transport == nil || options.UnixTransport.endpoint != p.Endpoint || options.TLSConfig != nil {
+			return nil, LocalError("invalid_request", "matching Unix transport injection is required")
 		}
-		tr.TLSClientConfig = t
+		tr, origin = options.UnixTransport, unixOrigin
+	} else {
+		if options.UnixTransport != nil {
+			return nil, LocalError("invalid_request", "Unix transport cannot serve a TCP endpoint")
+		}
+		if u.Scheme == "http" && !options.SyntheticHTTP {
+			return nil, LocalError("invalid_request", "loopback HTTP requires explicit synthetic mode")
+		}
+		tcp := newHTTPTransport()
+		if options.TLSConfig != nil {
+			t := options.TLSConfig.Clone()
+			if t.InsecureSkipVerify || (t.ServerName != "" && t.ServerName != u.Hostname()) {
+				return nil, LocalError("invalid_request", "TLS certificate and endpoint hostname verification are required")
+			}
+			tcp.TLSClientConfig = t
+		}
+		if credentials == nil {
+			return nil, LocalError("invalid_request", "projection and credential adapters are required")
+		}
+		token, err = credentials.Bearer(ctx, p)
+		if err != nil || token == "" || len(token) > 4096 || !utf8.ValidString(token) || strings.ContainsFunc(token, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+			return nil, LocalError("invalid_request", "credential resolution failed")
+		}
+		tr = tcp
 	}
-	c := &Client{projection: p, token: token, http: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
-	c.projection.Endpoint = strings.TrimSuffix(c.projection.Endpoint, "/")
+	c := &Client{projection: p, origin: origin, token: token, http: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 	ok := false
 	defer func() {
 		if !ok {
@@ -192,7 +223,7 @@ func (c *Client) request(ctx context.Context, method, path string, body []byte, 
 	if body != nil {
 		reader = struct{ io.Reader }{bytes.NewReader(body)}
 	}
-	req, err := http.NewRequestWithContext(ctx, method, c.projection.Endpoint+path, reader)
+	req, err := http.NewRequestWithContext(ctx, method, c.origin+path, reader)
 	if err != nil {
 		return nil, nil, "", transportError(write)
 	}
@@ -200,18 +231,24 @@ func (c *Client) request(ctx context.Context, method, path string, body []byte, 
 	if req.Header == nil {
 		req.Header = make(http.Header)
 	}
-	req.Header.Set("Authorization", "Bearer "+c.token)
+	if c.token == "" {
+		if hasAuthorization(req.Header) {
+			return nil, nil, "", LocalError("invalid_request", "authorization headers are forbidden on Unix transport")
+		}
+	} else {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
 	req.Header.Set("Accept", "application/json")
 	if archive && method == http.MethodGet {
 		req.Header.Set("Accept", "application/gzip")
 	}
 	res, err := c.http.Do(req)
 	if err != nil {
-		return nil, nil, "", transportError(write)
+		return nil, nil, "", requestError(err, write)
 	}
 	defer res.Body.Close()
 	id := res.Header.Get("X-Request-ID")
-	if !safeID.MatchString(id) || strings.Contains(id, c.token) {
+	if !safeID.MatchString(id) || (c.token != "" && strings.Contains(id, c.token)) {
 		id = RequestID()
 	}
 	if res.StatusCode >= 300 && res.StatusCode < 400 {

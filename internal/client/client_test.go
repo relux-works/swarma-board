@@ -45,7 +45,7 @@ func preflight(w http.ResponseWriter, r *http.Request) bool {
 }
 func newClient(t *testing.T, s *httptest.Server, tlsConfig *tls.Config) *Client {
 	t.Helper()
-	c, err := New(context.Background(), projection(s.URL), credential(), Options{TLSConfig: tlsConfig})
+	c, err := New(context.Background(), projection(s.URL), credential(), Options{SyntheticHTTP: true, TLSConfig: tlsConfig})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func TestProjectionFailClosed(t *testing.T) {
 		}
 	}
 	calls := 0
-	_, err := New(context.Background(), projection("http://localhost"), credentialFunc(func(context.Context, contract.Projection) (string, error) { calls++; return syntheticBearer, nil }), Options{})
+	_, err := New(context.Background(), projection("http://localhost"), credentialFunc(func(context.Context, contract.Projection) (string, error) { calls++; return syntheticBearer, nil }), Options{SyntheticHTTP: true})
 	if err == nil || calls != 0 {
 		t.Fatal("credential accessed before projection validation")
 	}
@@ -140,7 +140,7 @@ func TestProjectionFailClosed(t *testing.T) {
 		p contract.ProjectionSource
 		c contract.CredentialSource
 	}{{nil, credential()}, {projection(valid.Endpoint), nil}} {
-		if _, err := New(context.Background(), pair.p, pair.c, Options{}); ExitCode(err) != 2 {
+		if _, err := New(context.Background(), pair.p, pair.c, Options{SyntheticHTTP: true}); ExitCode(err) != 2 {
 			t.Fatal("missing adapter did not fail locally")
 		}
 	}
@@ -185,7 +185,7 @@ func TestPreflightFailureNeverReachesProject(t *testing.T) {
 			if kind == "invalid-credential" {
 				cred = credentialFunc(func(context.Context, contract.Projection) (string, error) { return "", nil })
 			}
-			c, err := New(context.Background(), projection(s.URL), cred, Options{})
+			c, err := New(context.Background(), projection(s.URL), cred, Options{SyntheticHTTP: true})
 			if c != nil || err == nil || projectCalls != 0 {
 				t.Fatalf("unsafe preflight: %v calls=%d", err, projectCalls)
 			}
@@ -214,7 +214,7 @@ func TestRedirectNeverForwardsBearer(t *testing.T) {
 				preflight(w, r)
 			}))
 			defer source.Close()
-			c, err := New(context.Background(), projection(source.URL), credential(), Options{})
+			c, err := New(context.Background(), projection(source.URL), credential(), Options{SyntheticHTTP: true})
 			if err == nil {
 				defer c.Close()
 				_, err = c.Query(context.Background(), "count()", false, nil)
@@ -228,10 +228,10 @@ func TestRedirectNeverForwardsBearer(t *testing.T) {
 func TestTLSVerificationRequired(t *testing.T) {
 	s := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { preflight(w, r) }))
 	defer s.Close()
-	if _, err := New(context.Background(), projection(s.URL), credential(), Options{}); err == nil {
+	if _, err := New(context.Background(), projection(s.URL), credential(), Options{SyntheticHTTP: true}); err == nil {
 		t.Fatal("untrusted TLS accepted")
 	}
-	if _, err := New(context.Background(), projection(s.URL), credential(), Options{TLSConfig: &tls.Config{InsecureSkipVerify: true}}); ExitCode(err) != 2 {
+	if _, err := New(context.Background(), projection(s.URL), credential(), Options{SyntheticHTTP: true, TLSConfig: &tls.Config{InsecureSkipVerify: true}}); ExitCode(err) != 2 {
 		t.Fatal("insecure option accepted")
 	}
 }
@@ -369,7 +369,7 @@ func TestAmbiguousPreflightFailsBeforeProject(t *testing.T) {
 			}
 			io.WriteString(w, body)
 		}))
-		_, err := New(context.Background(), projection(s.URL), credential(), Options{})
+		_, err := New(context.Background(), projection(s.URL), credential(), Options{SyntheticHTTP: true})
 		s.Close()
 		if ExitCode(err) != 2 {
 			t.Fatal("ambiguous capability/version not rejected locally", err)
@@ -386,7 +386,7 @@ func TestAmbiguousPreflightFailsBeforeProject(t *testing.T) {
 		io.WriteString(w, `{"account_id":"other","account_id":"synthetic-account"}`)
 	}))
 	defer s.Close()
-	if _, err := New(context.Background(), projection(s.URL), credential(), Options{}); ExitCode(err) != 2 {
+	if _, err := New(context.Background(), projection(s.URL), credential(), Options{SyntheticHTTP: true}); ExitCode(err) != 2 {
 		t.Fatal("ambiguous account accepted", err)
 	}
 }

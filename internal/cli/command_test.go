@@ -30,7 +30,7 @@ func (cliCredential) Bearer(context.Context, contract.Projection) (string, error
 	return cliToken, nil
 }
 func optionsFor(s *httptest.Server) Options {
-	return Options{Projection: testadapter.Projection{Value: contract.Projection{Endpoint: s.URL, ProjectID: "synthetic-board", AccountID: "synthetic-account"}}, Credential: cliCredential{}}
+	return Options{SyntheticHTTP: true, Projection: testadapter.Projection{Value: contract.Projection{Endpoint: s.URL, ProjectID: "synthetic-board", AccountID: "synthetic-account"}}, Credential: cliCredential{}}
 }
 func runTest(args []string, o Options) (int, string, string) {
 	var out, err bytes.Buffer
