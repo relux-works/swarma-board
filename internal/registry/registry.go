@@ -121,6 +121,17 @@ func (r *Registry) View(ctx context.Context, id string) (contract.Snapshot, erro
 	defer done()
 	return d.View(ctx, id)
 }
+
+// ExportView holds one registry lease for the coherent store read, so Close
+// cannot drain the handle between snapshot and journal extraction.
+func (r *Registry) ExportView(ctx context.Context, id string) (contract.Snapshot, []store.AuditEvent, error) {
+	d, done, e := r.acquire(id)
+	if e != nil {
+		return contract.Snapshot{}, nil, e
+	}
+	defer done()
+	return d.ExportView(ctx, id)
+}
 func (r *Registry) Update(ctx context.Context, id string, v contract.Revision, a contract.AuditContext, fn func(contract.Snapshot) (contract.ChangeSet, error)) (contract.Commit, error) {
 	d, done, e := r.acquire(id)
 	if e != nil {

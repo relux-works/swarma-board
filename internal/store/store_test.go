@@ -280,6 +280,10 @@ func TestCrashAtomicity(t *testing.T) {
 	if !reflect.DeepEqual(before, after) || !reflect.DeepEqual(auditsBefore, auditsAfter) {
 		t.Fatal("crash exposed partial update")
 	}
+	exported, history, e := reopened.ExportView(ctx, "alpha")
+	if e != nil || !reflect.DeepEqual(before, exported) || !reflect.DeepEqual(auditsBefore, history) {
+		t.Fatal("post-kill coherent export mismatch", e)
+	}
 }
 
 func TestUnversionedDatabaseRefusalDoesNotWriteStormMetadata(t *testing.T) {

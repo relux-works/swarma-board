@@ -71,6 +71,9 @@ func TestProvisionIsolationRestartAndDrain(t *testing.T) {
 	if _, e = r.View(ctx, "alpha"); e == nil {
 		t.Fatal("closing accepted lease")
 	}
+	if _, _, e = r.ExportView(ctx, "alpha"); e == nil {
+		t.Fatal("closing accepted export lease")
+	}
 	select {
 	case e := <-closed:
 		t.Fatal("closed before lease drained", e)
@@ -170,5 +173,40 @@ func TestRestoreRefusesRunningDirectory(t *testing.T) {
 	}
 	if _, e = os.Stat(path); !os.IsNotExist(e) {
 		t.Fatal("restore created file before ownership check", e)
+	}
+}
+
+func TestRegistryExportViewProjectIsolationAndDetachment(t *testing.T) {
+	r, e := New(t.TempDir())
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer r.Close()
+	ctx := context.Background()
+	if e = r.Provision(ctx, []contract.Project{{ID: "alpha"}, {ID: "beta"}}); e != nil {
+		t.Fatal(e)
+	}
+	_, e = r.Update(ctx, "alpha", 0, contract.AuditContext{AccountID: "test"}, func(contract.Snapshot) (contract.ChangeSet, error) {
+		return contract.ChangeSet{Upserts: []contract.Element{{ID: "TASK-one", Notes: "alpha"}}}, nil
+	})
+	if e != nil {
+		t.Fatal(e)
+	}
+	s, events, e := r.ExportView(ctx, "alpha")
+	if e != nil || s.Revision != 1 || len(events) != 1 || events[0].ChangedIDs[0] != "TASK-one" {
+		t.Fatal(s, events, e)
+	}
+	s.Elements[0].Notes = "mutated"
+	events[0].ChangedIDs[0] = "mutated"
+	s, events, e = r.ExportView(ctx, "alpha")
+	if e != nil || s.Elements[0].Notes != "alpha" || events[0].ChangedIDs[0] != "TASK-one" {
+		t.Fatal("export aliased", e)
+	}
+	s, events, e = r.ExportView(ctx, "beta")
+	if e != nil || s.Revision != 0 || len(s.Elements) != 0 || len(events) != 0 {
+		t.Fatal("cross-project journal", s, events, e)
+	}
+	if _, _, e = r.ExportView(ctx, "foreign"); e == nil {
+		t.Fatal("unknown project accepted")
 	}
 }
