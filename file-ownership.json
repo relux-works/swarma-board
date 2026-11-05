@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "unit": "A2-261105-014-board-architecture",
+  "architect": "agents2_swarma_dev10",
+  "source_commit": "09bac3d89822c9b83c04dff6483d7b2074097a82",
+  "destination_module": "github.com/relux-works/swarma-board",
+  "status": "architect-agreed-implementation-proposal-pending-independent-review-and-owner-landing",
+  "normative_contract": "contract.md",
+  "upstream_contract_claimed": false,
+  "independent_review_verdict": null,
+  "repository": "relux-works/swarma-board",
+  "visibility": "private",
+  "go_version": "1.25.5",
+  "modules": [
+    {
+      "path": ".",
+      "module": "github.com/relux-works/swarma-board"
+    }
+  ],
+  "owners": [
+    {
+      "owner": "baseline-integrator",
+      "paths": [
+        "go.mod",
+        "go.sum",
+        "LICENSE*",
+        "NOTICE*",
+        "PROVENANCE.md",
+        "contract.md",
+        "decisions.json",
+        "file-ownership.json",
+        "task-decomposition.json",
+        "internal/contract/**",
+        "cmd/swarma-board/**",
+        "cmd/swarma-board-server/**",
+        "internal/app/**",
+        "integration/**",
+        ".github/**"
+      ],
+      "responsibility": "Materialize frozen contract types/interfaces, root module and synthetic contract fixtures; compose implementations and qualification. Only writer of shared files/dependency changes."
+    },
+    {
+      "owner": "domain-query-producer",
+      "paths": [
+        "internal/domain/**",
+        "internal/query/**"
+      ],
+      "responsibility": "Task facts/lifecycle/validation, pure DAG/projections/plans, allowlisted agentquery AST/parser/selector and Service implementation. Imports internal/contract; no HTTP/storage/auth/platform calls."
+    },
+    {
+      "owner": "server-store-producer",
+      "paths": [
+        "internal/store/**",
+        "internal/registry/**",
+        "internal/httpapi/**",
+        "internal/auth/**"
+      ],
+      "responsibility": "Storm transaction Repository, project leases, HTTP boundary/error/ETag/auth checks, readiness; Authorizer local adapter compatible. No bootstrap token printing or real source credential reads."
+    },
+    {
+      "owner": "client-cli-producer",
+      "paths": [
+        "internal/client/**",
+        "internal/cli/**",
+        "internal/platform/**"
+      ],
+      "responsibility": "Cobra product CLI, HTTP transport/preflight/revision behavior, narrow injected projection/credential seam, no ambient fallback or service autostart."
+    },
+    {
+      "owner": "transfer-producer",
+      "paths": [
+        "internal/transfer/**",
+        "internal/legacyparse/**"
+      ],
+      "responsibility": "Bounded tar.gz/native-v1/legacy-v2 conversion, inert provenance, exact digest and exclusion manifest, no storage commits/auth authority."
+    },
+    {
+      "owner": "baseline-integrator",
+      "paths": [
+        "internal/testadapter/**",
+        "testdata/contract/**"
+      ],
+      "responsibility": "Shared in-memory/fd synthetic adapters and synthetic common fixtures, authored once from frozen contract; package-specific fixtures stay with their owner."
+    }
+  ],
+  "default_unlisted_path_policy": "Integrator assigns explicitly before writing; no overlapping ownership or source edits.",
+  "change_protocol": "Propose shared-contract/go.mod changes to integrator as artifact/patch; no direct concurrent edits. Orchestrator assigns workers; architect launches nobody.",
+  "allowed_dependencies": [
+    "existing Go standard library",
+    "github.com/relux-works/skill-agent-facing-api/agentquery v1.6.1",
+    "github.com/asdine/storm/v3 v3.2.1",
+    "go.etcd.io/bbolt v1.3.4",
+    "github.com/go-chi/chi/v5 v5.2.4",
+    "Cobra version from pinned CLI go.mod"
+  ],
+  "forbidden_carryover": [
+    "whole legacy CLI root",
+    "pkg/remoteconfig",
+    "client filesystem board store",
+    "run/spawn/session/provider/scheduler/ceiling/TUI packages",
+    "MinIO/binary resource backend absent approved requirement",
+    "native-context legacyimport",
+    "whole execution-ledger query registration"
+  ],
+  "dependency_direction": {
+    "internal/contract": [
+      "standard library only"
+    ],
+    "internal/domain": [
+      "internal/contract",
+      "internal/query"
+    ],
+    "internal/query": [
+      "internal/contract",
+      "agentquery"
+    ],
+    "internal/store": [
+      "internal/contract",
+      "Storm/bbolt"
+    ],
+    "internal/httpapi": [
+      "internal/contract",
+      "chi"
+    ],
+    "internal/client": [
+      "internal/contract",
+      "net/http"
+    ],
+    "internal/cli": [
+      "internal/contract",
+      "internal/client",
+      "Cobra"
+    ],
+    "internal/transfer": [
+      "internal/contract",
+      "internal/legacyparse"
+    ],
+    "internal/app": [
+      "all concrete packages for explicit composition only"
+    ]
+  }
+}

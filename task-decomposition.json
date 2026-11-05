@@ -1,0 +1,313 @@
+{
+  "schema_version": 1,
+  "unit": "A2-261105-014-board-architecture",
+  "architect": "agents2_swarma_dev10",
+  "source_commit": "09bac3d89822c9b83c04dff6483d7b2074097a82",
+  "destination_module": "github.com/relux-works/swarma-board",
+  "status": "architect-agreed-implementation-proposal-pending-independent-review-and-owner-landing",
+  "normative_contract": "contract.md",
+  "upstream_contract_claimed": false,
+  "independent_review_verdict": null,
+  "live_board_records_created": false,
+  "tasks": [
+    {
+      "id": "P0",
+      "title": "Materialize new-module contract baseline and shared synthetic fixtures",
+      "owner": "baseline-integrator",
+      "blocked_by": [],
+      "state": "ready-after-private-destination-base",
+      "inputs": [
+        "contract.md",
+        "decisions.json",
+        "file-ownership.json",
+        "private destination base from orchestrator"
+      ],
+      "outputs": [
+        "single root go.mod/go.sum with pinned allowed libraries",
+        "internal/contract frozen DTOs/interfaces/Error.Error method",
+        "internal/testadapter synthetic principal/grant/projection/credential fixtures",
+        "minimal composition signatures and source licensing/provenance"
+      ],
+      "acceptance": [
+        "Contract package compiles with standard library only.",
+        "No product implementation from legacy root/bootstrap is transplanted.",
+        "Interfaces match normative contract; every shared file has one writer."
+      ],
+      "acceptance_ids": [
+        "A14"
+      ]
+    },
+    {
+      "id": "P1",
+      "title": "Implement task service, hierarchy/lifecycle and retained DAG/plan DSL",
+      "owner": "domain-query-producer",
+      "blocked_by": [
+        "P0"
+      ],
+      "state": "packet-ready",
+      "inputs": [
+        "contract interfaces and synthetic Repository fake",
+        "source pinned domain/query/plan allowlist"
+      ],
+      "outputs": [
+        "internal/domain Service",
+        "internal/query Parser/selectors with exact operation allowlist",
+        "deterministic phases/path, SCC and dependency diagnostics"
+      ],
+      "acceptance": [
+        "A,B block C; C blocks D gives [A,B],[C],[D] and lexical [A,C,D] regardless of estimates.",
+        "Missing/active out-of-scope/cycle diagnostics never produce usable phases.",
+        "Status/estimate/assignee/terminal-ancestor/reparent guards; forbidden runtime fields/operations fail with zero writes.",
+        "Callback computes changes against transaction snapshot; no nested repository or I/O."
+      ],
+      "acceptance_ids": [
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07"
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Implement transactional single backend and authenticated HTTP boundary",
+      "owner": "server-store-producer",
+      "blocked_by": [
+        "P0"
+      ],
+      "state": "packet-ready",
+      "inputs": [
+        "contract Service/Parser/Transfer/Authorizer fakes",
+        "pinned server registry/store/auth evidence"
+      ],
+      "outputs": [
+        "internal/store Repository and per-project schema/revision/audit",
+        "internal/registry leased handles",
+        "internal/httpapi exact routes/errors/If-Match",
+        "internal/auth explicit synthetic hash-only credentials/grants"
+      ],
+      "acceptance": [
+        "Two CAS writers at N yield one N+1 and one 412; injected edge/import failure and process death expose all or none.",
+        "One consistent read revision, restart persistence, unknown-schema readiness refusal, isolated consistent backup/restore.",
+        "Missing/disabled/revoked/expired/wrong-project credentials fail; viewer cannot write; no ambient account or proxy identity.",
+        "No configured Authorizer means no listener; synthetic fixture mode is literal-loopback only."
+      ],
+      "acceptance_ids": [
+        "A01",
+        "A08",
+        "A09",
+        "A13",
+        "A15"
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Implement one HTTP client and product CLI with injected config/auth seams",
+      "owner": "client-cli-producer",
+      "blocked_by": [
+        "P0"
+      ],
+      "state": "packet-ready",
+      "inputs": [
+        "frozen wire envelopes/routes/DSL and httptest fake service",
+        "explicit synthetic projection + credential fd adapter"
+      ],
+      "outputs": [
+        "internal/client preflight/version/me and authenticated requests",
+        "internal/cli q/m/plan/import/export/version",
+        "internal/platform narrow local seams, no claimed upstream implementation"
+      ],
+      "acceptance": [
+        "Loopback and verified-TLS httptest produce equivalent facts/plans.",
+        "Projection/credential/contract/account mismatch fails before mutation; no ambient env/config/board filesystem.",
+        "If-Match auto read or explicit override, 412 is not retried; unknown write outcome returns nonzero for read/reconcile.",
+        "Errors map to prescribed exits, no HTTP200 in-band failure accepted, no credential logging or redirect forwarding."
+      ],
+      "acceptance_ids": [
+        "A02",
+        "A10",
+        "A13",
+        "A14"
+      ]
+    },
+    {
+      "id": "P4",
+      "title": "Implement bounded sanitized import/native export conversion",
+      "owner": "transfer-producer",
+      "blocked_by": [
+        "P0"
+      ],
+      "state": "packet-ready",
+      "inputs": [
+        "contract Snapshot/PreparedImport/Transfer",
+        "synthetic legacy-v2 and native-v1 archives only",
+        "pinned transfer/markdown parser evidence"
+      ],
+      "outputs": [
+        "internal/transfer Prepare/Encode",
+        "internal/legacyparse selected product parsers",
+        "synthetic field/exclusion/roundtrip and malicious archive fixtures"
+      ],
+      "acceptance": [
+        "No DB writes in Prepare; preserve text/ID/estimate distinction/edges/resources and inert sanitized activity provenance.",
+        "Digest/manifest/duplicate/unknown field/version/parent/cycle errors and malformed archive/limits reject before commit.",
+        "Unsupported resources/unknown meaningful content block instead of drop; exclusions are exact and commit requires consent.",
+        "Roundtrip preserves facts/graph; importing archive revision never overwrites target revision or grants."
+      ],
+      "acceptance_ids": [
+        "A11",
+        "A12"
+      ]
+    },
+    {
+      "id": "P5",
+      "title": "Compose and qualify synthetic MVP with one integrated acceptance report",
+      "owner": "baseline-integrator",
+      "blocked_by": [
+        "P1",
+        "P2",
+        "P3",
+        "P4"
+      ],
+      "state": "packet-ready",
+      "inputs": [
+        "four producer branches/patch artifacts",
+        "source-owner holds unchanged"
+      ],
+      "outputs": [
+        "cmd binaries wired to concrete local interfaces",
+        "integration contract witnesses A01-A15",
+        "exact removed command/config/dependency inventory",
+        "build/test logs, source extraction attribution and release candidate artifact"
+      ],
+      "acceptance": [
+        "GOMAXPROCS=2 go test -p 2 ./...; targeted race/CAS/fault/restart tests where meaningful.",
+        "Real process-kill/reopen transaction witness and separate backup restore proof, no merely mutex-based atomicity claim.",
+        "Actual CLI/service synthetic loopback docking plus verified-TLS test adapter coverage.",
+        "No source edits, secrets, runtime/provider calls, subprocess spawning, public/unprotected server, production adoption claim or review verdict."
+      ],
+      "acceptance_ids": [
+        "A01",
+        "A02",
+        "A03",
+        "A04",
+        "A05",
+        "A06",
+        "A07",
+        "A08",
+        "A09",
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14",
+        "A15"
+      ]
+    },
+    {
+      "id": "G1",
+      "title": "Independent Muse review, checks and authorized signed landing",
+      "owner": "orchestrator + independent Muse + authorized lander",
+      "blocked_by": [
+        "P5"
+      ],
+      "state": "external-gate",
+      "inputs": [
+        "muse-wonder-full-1.0-contributor xhigh independent staffing",
+        "PR/checks and exact owner landing grant"
+      ],
+      "outputs": [
+        "independent review findings/resolution and checks",
+        "SSH-signed Relux Zion bot landing evidence"
+      ],
+      "acceptance": [
+        "No Codex independent review ACCEPT and no owner-identity signing."
+      ],
+      "acceptance_ids": []
+    },
+    {
+      "id": "G2",
+      "title": "Adopt production adapter and authorized sanitized real snapshot; controlled dogfood/cutover",
+      "owner": "orchestrator + auth/source owners",
+      "blocked_by": [
+        "G1"
+      ],
+      "state": "external-gate",
+      "inputs": [
+        "U1 owning repository/pin/accepted configurator/auth contract and reviewed adapter",
+        "owner sanitized snapshot SHA256/redaction/custody/mappings/resources",
+        "exact writer switch/deployment authorization"
+      ],
+      "outputs": [
+        "production adapter evidence",
+        "dry-run field/count/hash/graph reconciliation",
+        "new-project atomic import + backup/restore + rollback reconciliation"
+      ],
+      "acceptance": [
+        "Synthetic fixtures never count as production authorization.",
+        "Source untouched until owner-authorized cutover; avoid dual writes and stale-board rollback."
+      ],
+      "acceptance_ids": [
+        "A11",
+        "A15"
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "tasks": [
+        "P0"
+      ]
+    },
+    {
+      "number": 2,
+      "tasks": [
+        "P1",
+        "P2",
+        "P3",
+        "P4"
+      ]
+    },
+    {
+      "number": 3,
+      "tasks": [
+        "P5"
+      ]
+    },
+    {
+      "number": 4,
+      "tasks": [
+        "G1"
+      ]
+    },
+    {
+      "number": 5,
+      "tasks": [
+        "G2"
+      ]
+    }
+  ],
+  "critical_path": {
+    "metric": "unweighted dependency edges, not elapsed time",
+    "tasks": [
+      "P0",
+      "P1",
+      "P5",
+      "G1",
+      "G2"
+    ],
+    "equally_long_alternatives": [
+      "P0,P2,P5,G1,G2",
+      "P0,P3,P5,G1,G2",
+      "P0,P4,P5,G1,G2"
+    ]
+  },
+  "parallel_release": "After P0 shared contracts, release P1/P2/P3/P4 together, each with own isolated clone and interface fakes; no producer waits for another implementation. Orchestrator alone staffs/registers/launches.",
+  "source_pins_immutable": true,
+  "production_auth_unknown_blocks_only": [
+    "production adapter implementation/adoption",
+    "G2"
+  ],
+  "deferred_followup": "New product skill after accepted interface/dogfood; no copied legacy usage instructions or artificial task inflation."
+}

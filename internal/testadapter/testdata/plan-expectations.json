@@ -1,0 +1,25 @@
+{
+  "synthetic": true,
+  "project_id": "synthetic-board",
+  "scope": "project",
+  "active": false,
+  "phases": [
+    [
+      "TASK-001",
+      "TASK-002"
+    ],
+    [
+      "TASK-003"
+    ],
+    [
+      "TASK-004"
+    ]
+  ],
+  "criticalPath": [
+    "TASK-001",
+    "TASK-003",
+    "TASK-004"
+  ],
+  "totalElements": 4,
+  "notes": "Element records include null, notEstimated and estimated/zero estimates; timestamps may be null; manual STORY edges are advisory."
+}

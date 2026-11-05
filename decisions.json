@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "unit": "A2-261105-014-board-architecture",
+  "architect": "agents2_swarma_dev10",
+  "source_commit": "09bac3d89822c9b83c04dff6483d7b2074097a82",
+  "destination_module": "github.com/relux-works/swarma-board",
+  "status": "architect-agreed-implementation-proposal-pending-independent-review-and-owner-landing",
+  "normative_contract": "contract.md",
+  "upstream_contract_claimed": false,
+  "independent_review_verdict": null,
+  "decisions": [
+    {
+      "id": "D1",
+      "title": "Storage",
+      "state": "agreed-by-assigned-architect-for-new-product-implementation",
+      "decision": "Single Storm v3.2.1/bbolt v1.3.4 service-owned backend for local and remote; one process/data directory, per-project DB, whole-mutation revision/audit transactions; no client FS backend or SQL rewrite.",
+      "evidence": [
+        "tools/board-server/go.mod:6-12",
+        "tools/board-server/internal/registry/registry.go:20-43,125-170",
+        "tools/board-server/internal/store/storm_store.go:16-68,304-331"
+      ],
+      "owner_landing_authorized": false
+    },
+    {
+      "id": "D2",
+      "title": "Lifecycle",
+      "state": "agreed-by-assigned-architect-for-new-product-implementation",
+      "decision": "Explicit canonical task facts; done/closed satisfy dependencies, remove integrating-checkpoint/CR authority; preserve estimate/assignee/hierarchy guards, manual container statuses and terminal-ancestor invariant.",
+      "evidence": [
+        "pkg/board/board.go:171-185",
+        "pkg/board/validation.go:29-100",
+        "pkg/board/types.go:191-225",
+        "pkg/board/estimate.go:105-133"
+      ],
+      "owner_landing_authorized": false
+    },
+    {
+      "id": "D3",
+      "title": "Planning",
+      "state": "agreed-by-assigned-architect-for-new-product-implementation",
+      "decision": "Retain leaf DAG, projected advisory containers, scope/set/children/related/active, Kahn waves and unweighted path; deterministic lexical ties; diagnostic unusable plans never hide problems.",
+      "evidence": [
+        "pkg/board/dependencies.go:30-134",
+        "pkg/board/dependency_cycles.go:71",
+        "pkg/board/plan/graph.go:109-193,310-355,392",
+        "pkg/board/query/operations.go:590-640"
+      ],
+      "owner_landing_authorized": false
+    },
+    {
+      "id": "D4",
+      "title": "API and import",
+      "state": "agreed-by-assigned-architect-for-new-product-implementation",
+      "decision": "Freeze root contract v1 exact route/DSL/field/native snapshot allowlists; legacy-v2 sanitized import adapter, bounded validation and atomic empty-project commit; no arbitrary legacy registration.",
+      "evidence": [
+        "pkg/board/query/operations.go:80-156",
+        "pkg/board/query/mutations.go:187-1325",
+        "pkg/board/query/fields.go:29-195",
+        "pkg/board/transfer/format.go:1-21",
+        "pkg/board/transfer/import.go:252-365",
+        "tools/board-server/internal/api/router.go:14-15,93-109"
+      ],
+      "owner_landing_authorized": false
+    },
+    {
+      "id": "D5",
+      "title": "Concurrency and trust",
+      "state": "agreed-by-assigned-architect-for-new-product-implementation",
+      "decision": "Strong revision CAS and all facts/audit in one transaction; explicit narrow projection/credential/authorizer seams, synthetic local adapter now, production adapter adoption held; fail closed with no credentials/scope; no ambient identity/network listener.",
+      "evidence": [
+        "tools/board-server/internal/store/storm_store.go:304-331",
+        "tools/board-server/internal/auth/service.go:109-156",
+        "tools/board-cli/cmd/root.go:123-164",
+        "tools/board-server/internal/api/router.go:93-109"
+      ],
+      "owner_landing_authorized": false
+    }
+  ],
+  "counterproposals": [
+    {
+      "topic": "Unknown upstream U1",
+      "resolution": "Inject exact local interfaces and synthetic adapter now; hold production adoption, do not invent an upstream API or serialize all producers behind it."
+    },
+    {
+      "topic": "Serial producer chain",
+      "resolution": "One baseline followed by four independent producer packets; one integration packet; shared files have a single owner."
+    },
+    {
+      "topic": "Broad admin API",
+      "resolution": "Explicit synthetic offline provisioning only; auth production provisioning remains held."
+    },
+    {
+      "topic": "Deletion",
+      "resolution": "Explicit confirm=true leaf-only deletion; incoming references refuse, no implicit subtree deletion."
+    },
+    {
+      "topic": "Planning/migrations/frameworks",
+      "resolution": "Computed phases, one native schema, explicit future migration only when required; no framework or schedule objects."
+    },
+    {
+      "topic": "Resource payloads",
+      "resolution": "Preserve safe references; unsupported required binary/local resources block real import, no silent loss or speculative MinIO dependency."
+    }
+  ],
+  "holds": {
+    "U1": "Production configurator/auth adapter needs owning source pin and accepted contract; synthetic implementation unblocked.",
+    "destination": "Orchestrator supplies private relux-works/swarma-board repository and base; architect does not create/publish.",
+    "real_data": "Owner-authorized sanitized snapshot/digest/mapping/custody/resources required before real adoption.",
+    "landing": "Independent Muse muse-wonder-full-1.0-contributor xhigh review, required checks and authorized signed owner landing.",
+    "cutover": "Separate source-owner writer switch/remote deployment authorization."
+  }
+}

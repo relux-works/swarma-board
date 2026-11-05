@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "synthetic": true,
+  "projects": [
+    {
+      "id": "synthetic-board",
+      "name": "Synthetic Board",
+      "description": "Synthetic fixture only; no real source records."
+    }
+  ],
+  "accounts": [
+    {
+      "id": "synthetic-viewer",
+      "disabled": false
+    },
+    {
+      "id": "synthetic-editor",
+      "disabled": false
+    },
+    {
+      "id": "synthetic-admin",
+      "disabled": false
+    }
+  ],
+  "tokens": [
+    {
+      "sha256": "57f0337378a50e0efbfbe2c3538c8f0e3d1b503f86d74fe6fe4902cc1200d992",
+      "account_id": "synthetic-viewer",
+      "revoked": false,
+      "expires_at": null
+    },
+    {
+      "sha256": "68a36126f5e9ef02a1121e7d59aab59037618c5f1ce81cb8d3668c417999c761",
+      "account_id": "synthetic-editor",
+      "revoked": false,
+      "expires_at": null
+    },
+    {
+      "sha256": "24f8acc0e391d68de79637043a4473325172b0ef63ca0b3d289be69cfc7b00e7",
+      "account_id": "synthetic-admin",
+      "revoked": false,
+      "expires_at": null
+    }
+  ],
+  "grants": [
+    {
+      "account_id": "synthetic-viewer",
+      "project_id": "synthetic-board",
+      "role": "viewer"
+    },
+    {
+      "account_id": "synthetic-editor",
+      "project_id": "synthetic-board",
+      "role": "editor"
+    },
+    {
+      "account_id": "synthetic-admin",
+      "project_id": "synthetic-board",
+      "role": "admin"
+    }
+  ]
+}

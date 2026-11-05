@@ -1,0 +1,202 @@
+{
+  "schema_version": 1,
+  "elements": [
+    {
+      "id": "EPIC-001",
+      "type": "epic",
+      "name": "synthetic-epic",
+      "parent_id": "",
+      "title": "Synthetic-Epic",
+      "description": "",
+      "scope": "",
+      "acceptance_criteria": "",
+      "status": "backlog",
+      "assigned_to": "",
+      "created_at": null,
+      "updated_at": null,
+      "blocked_by": [],
+      "manual_blocked_by": [],
+      "checklist": [],
+      "notes": "",
+      "estimate": null,
+      "review": "required",
+      "task_class": "code",
+      "resource_refs": []
+    },
+    {
+      "id": "STORY-001",
+      "type": "story",
+      "name": "first-story",
+      "parent_id": "EPIC-001",
+      "title": "First-Story",
+      "description": "",
+      "scope": "",
+      "acceptance_criteria": "",
+      "status": "backlog",
+      "assigned_to": "",
+      "created_at": null,
+      "updated_at": null,
+      "blocked_by": [],
+      "manual_blocked_by": [],
+      "checklist": [],
+      "notes": "",
+      "estimate": null,
+      "review": "required",
+      "task_class": "code",
+      "resource_refs": []
+    },
+    {
+      "id": "STORY-002",
+      "type": "story",
+      "name": "second-story",
+      "parent_id": "EPIC-001",
+      "title": "Second-Story",
+      "description": "",
+      "scope": "",
+      "acceptance_criteria": "",
+      "status": "backlog",
+      "assigned_to": "",
+      "created_at": null,
+      "updated_at": null,
+      "blocked_by": [],
+      "manual_blocked_by": [
+        "STORY-001"
+      ],
+      "checklist": [],
+      "notes": "",
+      "estimate": null,
+      "review": "required",
+      "task_class": "code",
+      "resource_refs": []
+    },
+    {
+      "id": "TASK-001",
+      "type": "task",
+      "name": "a",
+      "parent_id": "STORY-001",
+      "title": "Synthetic A — text preservation",
+      "description": "First line.\nSecond line.",
+      "scope": "Synthetic scope",
+      "acceptance_criteria": "Preserve text and ordered checklist.",
+      "status": "backlog",
+      "assigned_to": "synthetic-assignee",
+      "created_at": "2026-11-05T00:00:00Z",
+      "updated_at": "2026-11-05T00:00:00Z",
+      "blocked_by": [],
+      "manual_blocked_by": [],
+      "checklist": [
+        {
+          "text": "First check",
+          "checked": true
+        },
+        {
+          "text": "Second check",
+          "checked": false
+        }
+      ],
+      "notes": "Synthetic notes only.\nNo execution or authority markers.",
+      "estimate": {
+        "kind": "estimated",
+        "scale": {
+          "kind": "fibonacci",
+          "number": 3
+        }
+      },
+      "review": "required",
+      "task_class": "code",
+      "resource_refs": [
+        {
+          "name": "design",
+          "uri": "urn:synthetic:design:a",
+          "description": "Inert synthetic reference",
+          "type": "precondition"
+        },
+        {
+          "name": "result",
+          "uri": "https://example.invalid/synthetic/a",
+          "description": "Never fetched",
+          "type": "outcome"
+        }
+      ]
+    },
+    {
+      "id": "TASK-002",
+      "type": "task",
+      "name": "b",
+      "parent_id": "STORY-001",
+      "title": "B",
+      "description": "",
+      "scope": "",
+      "acceptance_criteria": "",
+      "status": "backlog",
+      "assigned_to": "",
+      "created_at": null,
+      "updated_at": null,
+      "blocked_by": [],
+      "manual_blocked_by": [],
+      "checklist": [],
+      "notes": "",
+      "estimate": null,
+      "review": "required",
+      "task_class": "code",
+      "resource_refs": []
+    },
+    {
+      "id": "TASK-003",
+      "type": "task",
+      "name": "c",
+      "parent_id": "STORY-002",
+      "title": "C",
+      "description": "",
+      "scope": "",
+      "acceptance_criteria": "",
+      "status": "backlog",
+      "assigned_to": "",
+      "created_at": null,
+      "updated_at": null,
+      "blocked_by": [
+        "TASK-001",
+        "TASK-002"
+      ],
+      "manual_blocked_by": [],
+      "checklist": [],
+      "notes": "",
+      "estimate": {
+        "kind": "notEstimated"
+      },
+      "review": "required",
+      "task_class": "code",
+      "resource_refs": []
+    },
+    {
+      "id": "TASK-004",
+      "type": "task",
+      "name": "d",
+      "parent_id": "STORY-002",
+      "title": "D",
+      "description": "",
+      "scope": "",
+      "acceptance_criteria": "",
+      "status": "backlog",
+      "assigned_to": "",
+      "created_at": null,
+      "updated_at": null,
+      "blocked_by": [
+        "TASK-003"
+      ],
+      "manual_blocked_by": [],
+      "checklist": [],
+      "notes": "",
+      "estimate": {
+        "kind": "estimated",
+        "scale": {
+          "kind": "fibonacci",
+          "number": 0
+        }
+      },
+      "review": "required",
+      "task_class": "code",
+      "resource_refs": []
+    }
+  ]
+}
