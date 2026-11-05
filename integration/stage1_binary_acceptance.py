@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import re
 import socket
+import stat
 import subprocess
 import tempfile
 import time
@@ -74,6 +75,70 @@ def request(sock, route):
         conn.close()
 
 
+def check_socket_startup_refusals(server, base, root, evidence):
+    witnesses = []
+    for case in ("socket-parent-0755", "occupied-live-socket"):
+        runtime = root / (case + "-run")
+        runtime.mkdir(mode=0o700)
+        # Explicit chmod: a restrictive process umask must not mask this probe.
+        runtime.chmod(0o755 if case == "socket-parent-0755" else 0o700)
+        sock, data, exports = runtime / "s", root / (case + "-data"), root / (case + "-exports")
+        changed = [x for x in base if not x.startswith(("--unix-socket=", "--data-dir=", "--audit-export-dir="))]
+        changed += ["--unix-socket=" + str(sock), "--data-dir=" + str(data), "--audit-export-dir=" + str(exports)]
+        foreign = None
+        before = None
+        try:
+            if case == "occupied-live-socket":
+                foreign = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                foreign.settimeout(2)
+                foreign.bind(str(sock))
+                foreign.listen(1)
+                before = sock.lstat()
+            assert not os.path.lexists(data) and not os.path.lexists(exports), "probe requires absent state"
+            assert stat.S_IMODE(runtime.stat().st_mode) == (0o755 if foreign is None else 0o700)
+            result = run(server, changed, 1)
+            witness = {"case": case, "exit": result.returncode,
+                       "runtime_mode": oct(stat.S_IMODE(runtime.stat().st_mode)),
+                       "data_created": os.path.lexists(data),
+                       "owner_lock_created": os.path.lexists(data / ".owner.lock"),
+                       "database_files": sorted(p.name for p in data.glob("*.db")),
+                       "exports_created": os.path.lexists(exports)}
+            if foreign is None:
+                witness["socket_created"] = os.path.lexists(sock)
+            else:
+                after = sock.lstat()
+                witness["foreign_socket_before"] = {"device": before.st_dev, "inode": before.st_ino,
+                                                    "mode": before.st_mode, "uid": before.st_uid,
+                                                    "mtime_ns": before.st_mtime_ns}
+                witness["foreign_socket_after"] = {"device": after.st_dev, "inode": after.st_ino,
+                                                   "mode": after.st_mode, "uid": after.st_uid,
+                                                   "mtime_ns": after.st_mtime_ns}
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as peer:
+                    peer.settimeout(2)
+                    peer.connect(str(sock))
+                    accepted, _ = foreign.accept()
+                    with accepted:
+                        accepted.sendall(b"foreign-listener-preserved")
+                        witness["foreign_listener_reachable"] = peer.recv(64) == b"foreign-listener-preserved"
+            # Retain observations even when the old binary exhibits F1.
+            (evidence / (case + ".json")).write_text(json.dumps(witness, indent=2) + "\n")
+            witnesses.append(witness)
+        finally:
+            if foreign is not None:
+                foreign.close()
+                if before is not None and os.path.lexists(sock) and os.path.samestat(before, sock.lstat()):
+                    sock.unlink()  # only this synthetic probe's own socket
+    for witness in witnesses:
+        assert not witness["data_created"] and not witness["owner_lock_created"] and not witness["database_files"], (witness["case"], "socket refusal created board data")
+        assert not witness["exports_created"], (witness["case"], "socket refusal created exports")
+        if witness["case"] == "socket-parent-0755":
+            assert not witness["socket_created"], "invalid parent created socket"
+        else:
+            assert witness["foreign_socket_before"] == witness["foreign_socket_after"], "foreign socket replaced or changed"
+            assert witness["foreign_listener_reachable"], "foreign listener disrupted"
+    return witnesses
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     for name in ("server", "client", "policy-fixture", "project", "account", "commit"):
@@ -125,6 +190,7 @@ def main():
             changed = [x for x in base if not x.startswith("--policy-version=")] + bad
             run(server, changed, 1)
             assert not data.exists() and not sock.exists(), "policy pin refusal wrote state"
+        socket_refusals = check_socket_startup_refusals(server, base, root, evidence)
         projection = root / "projection.json"
         projection.write_text(json.dumps({"endpoint": "unix://" + str(sock), "project_id": args.project, "account_id": args.account}))
         projection.chmod(0o600)
@@ -214,6 +280,7 @@ def main():
                       "synthetic_only": True, "policy_pin_checked": True, "policy_drift_latched": True,
                       "actual_cli_mutation_export": True, "manifest_status": "unsigned",
                       "source_bytes_inode_mtime_preserved": True, "live_writer_export_refused": True,
+                      "socket_refusals_no_data_created": socket_refusals,
                       "import_refused": True, "no_resurrection": True}
     (evidence / "acceptance.json").write_text(json.dumps(result, indent=2) + "\n")
     (evidence / "process.json").write_text(json.dumps(OBSERVATIONS, indent=2) + "\n")

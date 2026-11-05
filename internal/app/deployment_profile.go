@@ -35,6 +35,12 @@ func serveSingleTrustUnit(ctx context.Context, plan deployment.Plan,
 	if len(projects) == 0 {
 		return deployment.ErrConfig
 	}
+	// Refuse known listener failures before registry.New/Provision can write.
+	// ListenUnix repeats this read-only check at bind time; no path is reserved.
+	socketPath := strings.TrimPrefix(c.Endpoint, "unix://")
+	if err = preflightUnixSocket(socketPath); err != nil {
+		return err
+	}
 	r, err := registry.New(c.DataDir)
 	if err != nil {
 		return err
@@ -67,7 +73,7 @@ func serveSingleTrustUnit(ctx context.Context, plan deployment.Plan,
 	if err = peer.Ready(ctx); err != nil {
 		return err
 	}
-	listener, err := ListenUnix(strings.TrimPrefix(c.Endpoint, "unix://"))
+	listener, err := ListenUnix(socketPath)
 	if err != nil {
 		return err
 	}

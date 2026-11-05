@@ -22,6 +22,53 @@ func privateSocket(t *testing.T) string {
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	return filepath.Join(dir, "s.sock")
 }
+
+func TestListenUnixRechecksAfterReadOnlyPreflight(t *testing.T) {
+	path := privateSocket(t)
+	if err := preflightUnixSocket(path); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(path); !os.IsNotExist(err) {
+		t.Fatal("preflight created a socket", err)
+	}
+	dir := filepath.Dir(path)
+	if err := os.Chmod(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if l, err := ListenUnix(path); err == nil {
+		l.Close()
+		t.Fatal("parent mode changed after preflight but listener accepted")
+	}
+	if err := os.Chmod(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := preflightUnixSocket(path); err != nil {
+		t.Fatal(err)
+	}
+	foreign, err := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer foreign.Close()
+	before, err := os.Lstat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l, err := ListenUnix(path); err == nil {
+		l.Close()
+		t.Fatal("socket occupied after preflight but listener accepted")
+	}
+	after, err := os.Lstat(path)
+	if err != nil || !os.SameFile(before, after) || before.Mode() != after.Mode() {
+		t.Fatal("foreign socket changed", err)
+	}
+	conn, err := net.DialTimeout("unix", path, time.Second)
+	if err != nil {
+		t.Fatal("foreign listener no longer reachable", err)
+	}
+	conn.Close()
+}
+
 func TestUnixSocketPolicyNeverReplacesExistingAndPreservesReplacement(t *testing.T) {
 	path := privateSocket(t)
 	if e := os.WriteFile(path, []byte("existing"), 0600); e != nil {

@@ -65,30 +65,40 @@ func NewVerifiedTLSServer(h *httpapi.Handler, config *tls.Config) (*http.Server,
 	return s, nil
 }
 
+// preflightUnixSocket checks listener prerequisites without creating a socket or
+// changing the filesystem. Deployment calls it before provisioning storage.
+// It reserves nothing: ListenUnix must repeat it immediately before binding.
+func preflightUnixSocket(path string) error {
+	if validateUnixEndpoint(path) != nil || !filepath.IsAbs(path) || filepath.Clean(path) != path {
+		return unavailable()
+	}
+	dir := filepath.Dir(path)
+	st, e := os.Lstat(dir)
+	if e != nil || !st.IsDir() || st.Mode().Perm()&0077 != 0 {
+		return unavailable()
+	}
+	real, e := filepath.EvalSymlinks(dir)
+	if e != nil || real != dir {
+		return unavailable()
+	}
+	owner, ok := st.Sys().(*syscall.Stat_t)
+	if !ok || owner.Uid != uint32(os.Geteuid()) {
+		return unavailable()
+	}
+	if _, e = os.Lstat(path); !os.IsNotExist(e) {
+		return unavailable()
+	}
+	return nil
+}
+
 // ListenUnix refuses existing sockets, symlinks and nonprivate parent directories.
 // The Host supplies an existing absolute directory owned by the service UID.
 // No stale socket is deleted, and cleanup removes only the inode we created.
 // Shared-UID actors remain indistinguishable; these modes provide no isolation
 // against another process using the same OS identity.
 func ListenUnix(path string) (net.Listener, error) {
-	if validateUnixEndpoint(path) != nil || !filepath.IsAbs(path) || filepath.Clean(path) != path {
-		return nil, unavailable()
-	}
-	dir := filepath.Dir(path)
-	st, e := os.Lstat(dir)
-	if e != nil || !st.IsDir() || st.Mode().Perm()&0077 != 0 {
-		return nil, unavailable()
-	}
-	real, e := filepath.EvalSymlinks(dir)
-	if e != nil || real != dir {
-		return nil, unavailable()
-	}
-	owner, ok := st.Sys().(*syscall.Stat_t)
-	if !ok || owner.Uid != uint32(os.Geteuid()) {
-		return nil, unavailable()
-	}
-	if _, e = os.Lstat(path); !os.IsNotExist(e) {
-		return nil, unavailable()
+	if e := preflightUnixSocket(path); e != nil {
+		return nil, e
 	}
 	l, e := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
 	if e != nil {
