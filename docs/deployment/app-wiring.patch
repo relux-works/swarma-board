@@ -1,0 +1,124 @@
+diff --git a/internal/app/deployment_profile.go b/internal/app/deployment_profile.go
+new file mode 100644
+--- /dev/null
++++ b/internal/app/deployment_profile.go
+@@ -0,0 +1,119 @@
++package app
++
++import (
++	"context"
++	"fmt"
++	"io"
++	"os"
++	"strings"
++	"time"
++
++	"github.com/relux-works/swarma-board/internal/auth"
++	"github.com/relux-works/swarma-board/internal/cli"
++	"github.com/relux-works/swarma-board/internal/contract"
++	"github.com/relux-works/swarma-board/internal/deployment"
++	"github.com/relux-works/swarma-board/internal/domain"
++	"github.com/relux-works/swarma-board/internal/registry"
++)
++
++// PROPOSAL: entry parsing and dev8 adapter loading are integrator-owned. Call
++// deployment.Validate before loading the adapter, then supply its actual grants.
++func serveSingleTrustUnit(ctx context.Context, plan deployment.Plan,
++	resolver auth.ProtectedPeerResolver, projects []contract.Project,
++	commit string, notices io.Writer) (err error) {
++	c, err := plan.Config()
++	if err != nil {
++		return err
++	}
++	peer, err := auth.NewPeerAuthorizer(resolver)
++	if err != nil {
++		return err
++	}
++	if err = peer.Ready(ctx); err != nil {
++		return err
++	}
++	if len(projects) == 0 {
++		return deployment.ErrConfig
++	}
++	r, err := registry.New(c.DataDir)
++	if err != nil {
++		return err
++	}
++	defer func() {
++		if e := r.Close(); err == nil {
++			err = e
++		}
++	}()
++	if err = r.Provision(ctx, projects); err != nil {
++		return err
++	}
++	service, err := domain.New(r, time.Now, newID)
++	if err != nil {
++		return err
++	}
++	// Existing NewUnixServer needs this carrier, not a synthetic fixture.
++	server, err := NewUnixServer(&Synthetic{Registry: r, Service: service}, resolver, commit)
++	if err != nil {
++		return err
++	}
++	defer server.Close()
++	server.Handler, err = plan.WithStatusHeaders(server.Handler)
++	if err != nil {
++		return err
++	}
++	if err = r.Ready(ctx); err != nil {
++		return err
++	}
++	if err = peer.Ready(ctx); err != nil {
++		return err
++	}
++	listener, err := ListenUnix(strings.TrimPrefix(c.Endpoint, "unix://"))
++	if err != nil {
++		return err
++	}
++	defer listener.Close()
++	if notices == nil {
++		notices = os.Stderr
++	}
++	if err = plan.WriteStatus(notices); err != nil {
++		return err
++	}
++	// This returns only after request drain; deferred registry close comes last.
++	return ServeUntilCanceled(ctx, server, listener)
++}
++
++type selectedDeploymentProjection struct{ value contract.Projection }
++
++func (s selectedDeploymentProjection) Resolve(ctx context.Context) (contract.Projection, error) {
++	if err := ctx.Err(); err != nil {
++		return contract.Projection{}, err
++	}
++	return s.value, nil
++}
++
++// Call only after unambiguous profile/flag parsing and one projection resolve.
++// No server-private config, policy loader, credentials or subprocess is needed.
++func runSingleTrustClient(ctx context.Context, profile string, projection contract.Projection,
++	args []string, commit string, out, errOut io.Writer) int {
++	if out == nil {
++		out = os.Stdout
++	}
++	if errOut == nil {
++		errOut = os.Stderr
++	}
++	tr, err := deployment.NewClientTransport(profile, projection)
++	if err != nil {
++		fmt.Fprintln(errOut, err)
++		return 2
++	}
++	defer tr.CloseIdleConnections()
++	code := cli.Run(ctx, args, cli.Options{
++		Projection: selectedDeploymentProjection{value: projection},
++		Credential: nil, UnixTransport: tr, TLSConfig: nil, SyntheticHTTP: false,
++		Commit: commit, Out: out, Err: errOut,
++	})
++	if code == 1 {
++		fmt.Fprintln(errOut, "If the selected service is down, ask Host/launcher to recover it; reconcile any unknown write outcome before another write.")
++	}
++	return code
++}
