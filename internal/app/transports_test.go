@@ -20,6 +20,10 @@ func privateSocket(t *testing.T) string {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
+	dir, e = filepath.EvalSymlinks(dir)
+	if e != nil {
+		t.Fatal(e)
+	}
 	return filepath.Join(dir, "s.sock")
 }
 

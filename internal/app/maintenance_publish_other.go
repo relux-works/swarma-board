@@ -1,4 +1,4 @@
-//go:build !linux || !amd64
+//go:build !darwin && (!linux || !amd64)
 
 package app
 
@@ -8,5 +8,5 @@ import (
 )
 
 func renameCheckpointNoReplace(_ *os.File, _, _ string) error {
-	return errors.New("checkpoint no-replace publication is qualified only on Linux amd64")
+	return errors.New("checkpoint no-replace publication is qualified only on Linux amd64 and Darwin")
 }

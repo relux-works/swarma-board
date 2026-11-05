@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || darwin
 
 package auth_test
 
@@ -31,6 +31,10 @@ func TestStaticPolicyRealUnixKernelUIDNoBearerAndDrift(t *testing.T) {
 		t.Fatal(e)
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
+	dir, e = filepath.EvalSymlinks(dir)
+	if e != nil {
+		t.Fatal(e)
+	}
 	path := filepath.Join(dir, "policy.json")
 	data, e := json.Marshal(map[string]any{
 		"schema_version": 1, "policy_version": "socket-test-release",

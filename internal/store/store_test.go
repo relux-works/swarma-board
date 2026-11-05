@@ -26,6 +26,29 @@ var ctx = context.Background()
 var project = contract.Project{ID: "alpha", Name: "Synthetic alpha"}
 var actor = contract.AuditContext{AccountID: "synthetic-editor", RequestID: "synthetic-request", Operation: "set_notes", At: time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)}
 
+// Restore requires an explicitly private offline directory. testing.TempDir
+// creates its numbered child with 0777 subject to the caller's umask.
+func privateRestoreDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if e := os.Chmod(dir, 0700); e != nil {
+		t.Fatal(e)
+	}
+	assertRestoreDirectoryMode(t, dir, 0700)
+	return dir
+}
+
+func assertRestoreDirectoryMode(t *testing.T, dir string, mode os.FileMode) {
+	t.Helper()
+	st, e := os.Lstat(dir)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if st.Mode() != os.ModeDir|mode {
+		t.Fatalf("restore fixture mode: got %v, want %v", st.Mode(), os.ModeDir|mode)
+	}
+}
+
 func openTest(t *testing.T) (*DB, string) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "alpha.db")
@@ -198,7 +221,20 @@ func TestBackupRestoreSchemaAndPrivacy(t *testing.T) {
 	if e := d.Backup(ctx, &b); e != nil {
 		t.Fatal(e)
 	}
-	dst := filepath.Join(t.TempDir(), "alpha.db")
+	// A valid backup must still refuse a public destination directory before
+	// creating either the destination or its ownership lock.
+	public := privateRestoreDir(t)
+	if e := os.Chmod(public, 0755); e != nil {
+		t.Fatal(e)
+	}
+	assertRestoreDirectoryMode(t, public, 0755)
+	if e := Restore(ctx, filepath.Join(public, "alpha.db"), project, bytes.NewReader(b.Bytes())); code(e) != "unavailable" {
+		t.Fatal("public restore directory accepted", e)
+	}
+	if entries, e := os.ReadDir(public); e != nil || len(entries) != 0 {
+		t.Fatal("public-directory refusal changed fixture", entries, e)
+	}
+	dst := filepath.Join(privateRestoreDir(t), "alpha.db")
 	if e := Restore(ctx, dst, project, bytes.NewReader(b.Bytes())); e != nil {
 		t.Fatal(e)
 	}
@@ -368,7 +404,7 @@ func TestViewsAndBackupAreCoherentDuringWrites(t *testing.T) {
 		if e = d.Backup(ctx, &backup); e != nil {
 			t.Fatal(e)
 		}
-		path := filepath.Join(t.TempDir(), "alpha.db")
+		path := filepath.Join(privateRestoreDir(t), "alpha.db")
 		if e = Restore(ctx, path, project, bytes.NewReader(backup.Bytes())); e != nil {
 			t.Fatal(e)
 		}

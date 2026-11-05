@@ -1,4 +1,4 @@
-//go:build linux && amd64
+//go:build (linux && amd64) || darwin
 
 package app
 
@@ -12,7 +12,10 @@ import (
 )
 
 func TestCheckpointAtomicNoReplaceAndCanceledStaging(t *testing.T) {
-	parent := t.TempDir()
+	parent, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(parent, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +30,7 @@ func TestCheckpointAtomicNoReplaceAndCanceledStaging(t *testing.T) {
 		}
 	}
 	// Exercise the final syscall against an empty target, bypassing preflight.
-	// Linux rename without NOREPLACE would silently replace this directory.
+	// An overwrite-capable rename would silently replace this directory.
 	if err = renameCheckpointNoReplace(f, "stage", "occupied"); err == nil {
 		t.Fatal("replaced existing empty output")
 	}

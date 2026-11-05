@@ -12,9 +12,32 @@ import (
 	"github.com/relux-works/swarma-board/internal/store"
 )
 
+// TempDir's numbered child is created with 0777 subject to umask, not 0700.
+// Establish the private-directory contract explicitly on this synthetic fixture.
+func privateTestDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	if e := os.Chmod(dir, 0700); e != nil {
+		t.Fatal(e)
+	}
+	assertDirectoryMode(t, dir, 0700)
+	return dir
+}
+
+func assertDirectoryMode(t *testing.T, dir string, mode os.FileMode) {
+	t.Helper()
+	st, e := os.Lstat(dir)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if st.Mode() != os.ModeDir|mode {
+		t.Fatalf("directory fixture mode: got %v, want %v", st.Mode(), os.ModeDir|mode)
+	}
+}
+
 func TestProvisionIsolationRestartAndDrain(t *testing.T) {
 	ctx := context.Background()
-	dir := t.TempDir()
+	dir := privateTestDir(t)
 	r, e := New(dir)
 	if e != nil {
 		t.Fatal(e)
@@ -106,7 +129,7 @@ func TestProvisionIsolationRestartAndDrain(t *testing.T) {
 	}
 }
 func TestPrivateDirectorySchemaAndLockRefusal(t *testing.T) {
-	dir := t.TempDir()
+	dir := privateTestDir(t)
 	r, e := New(dir)
 	if e != nil {
 		t.Fatal(e)
@@ -123,15 +146,19 @@ func TestPrivateDirectorySchemaAndLockRefusal(t *testing.T) {
 	if e = r.Provision(context.Background(), []contract.Project{{ID: "../escape"}}); e == nil {
 		t.Fatal("path project allowed")
 	}
-	bad := t.TempDir()
+	bad := privateTestDir(t)
 	if e = os.Chmod(bad, 0755); e != nil {
 		t.Fatal(e)
 	}
+	assertDirectoryMode(t, bad, 0755)
 	if other, e := New(bad); e == nil {
 		other.Close()
 		t.Fatal("public directory allowed")
 	}
-	missingSchema := t.TempDir()
+	if entries, e := os.ReadDir(bad); e != nil || len(entries) != 0 {
+		t.Fatal("public-directory refusal changed fixture", entries, e)
+	}
+	missingSchema := privateTestDir(t)
 	dbpath := filepath.Join(missingSchema, "alpha.db")
 	if e = os.WriteFile(dbpath, []byte("invalid database"), 0600); e != nil {
 		t.Fatal(e)
@@ -141,7 +168,7 @@ func TestPrivateDirectorySchemaAndLockRefusal(t *testing.T) {
 		t.Fatal("invalid storage ready")
 	}
 	// A v1 database with the wrong identity is refused by startup discovery.
-	wrong := t.TempDir()
+	wrong := privateTestDir(t)
 	d, e := store.Open(filepath.Join(wrong, "beta.db"), contract.Project{ID: "alpha"}, true)
 	if e != nil {
 		t.Fatal(e)
@@ -154,7 +181,7 @@ func TestPrivateDirectorySchemaAndLockRefusal(t *testing.T) {
 }
 
 func TestRestoreRefusesRunningDirectory(t *testing.T) {
-	dir := t.TempDir()
+	dir := privateTestDir(t)
 	r, e := New(dir)
 	if e != nil {
 		t.Fatal(e)
@@ -177,7 +204,7 @@ func TestRestoreRefusesRunningDirectory(t *testing.T) {
 }
 
 func TestRegistryExportViewProjectIsolationAndDetachment(t *testing.T) {
-	r, e := New(t.TempDir())
+	r, e := New(privateTestDir(t))
 	if e != nil {
 		t.Fatal(e)
 	}

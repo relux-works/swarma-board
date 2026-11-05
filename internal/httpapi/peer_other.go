@@ -1,8 +1,8 @@
-//go:build !linux
+//go:build !linux && !darwin
 
 package httpapi
 
 import "net"
 
-// SO_PEERCRED support is deliberately Linux-only; other hosts fail closed.
+// Hosts without a qualified kernel peer credential implementation fail closed.
 func acceptedUnixUID(net.Conn) (uint32, error) { return 0, problem("unavailable") }

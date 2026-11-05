@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || darwin
 
 package auth
 
@@ -17,6 +17,17 @@ import (
 
 const testPolicyVersion = "synthetic-release-1"
 
+// Darwin's default temporary directory can traverse /var -> /private/var.
+// Canonicalize fixture parents, never the production policy path.
+func staticTestDir(t *testing.T) string {
+	t.Helper()
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 func staticTestPolicy() map[string]any {
 	return map[string]any{
 		"schema_version": 1, "policy_version": testPolicyVersion,
@@ -31,7 +42,7 @@ func staticTestPolicy() map[string]any {
 func writeStaticTestPolicy(t *testing.T, f map[string]any) (string, []byte) {
 	t.Helper()
 	data := encode(t, f)
-	path := filepath.Join(t.TempDir(), "policy.json")
+	path := filepath.Join(staticTestDir(t), "policy.json")
 	if e := os.WriteFile(path, data, 0600); e != nil {
 		t.Fatal(e)
 	}
@@ -187,7 +198,7 @@ func TestStaticPolicyClosedSchema(t *testing.T) {
 		bytes.Replace(base, []byte(`"remote_tls":false`), []byte(`"remote_tls":false,"remote_\u0074ls":false`), 1),
 		bytes.Repeat([]byte(" "), maxStaticPolicyBytes+1),
 	} {
-		path := filepath.Join(t.TempDir(), "policy.json")
+		path := filepath.Join(staticTestDir(t), "policy.json")
 		if e := os.WriteFile(path, data, 0600); e != nil {
 			t.Fatal(e)
 		}
@@ -200,9 +211,32 @@ func TestStaticPolicyClosedSchema(t *testing.T) {
 func TestStaticPolicyFileCustody(t *testing.T) {
 	for _, mode := range []os.FileMode{0000, 0400, 0640, 0644, 0700, 0600 | os.ModeSetuid, 0600 | os.ModeSetgid, 0600 | os.ModeSticky} {
 		path, _ := writeStaticTestPolicy(t, staticTestPolicy())
+		// A parent-inherited group need not be one this user belongs to.
+		// Establish our own effective group on this disposable file before
+		// requesting setgid; some kernels silently clear an unowned group bit.
+		if mode&os.ModeSetgid != 0 {
+			if e := os.Chown(path, -1, os.Getegid()); e != nil {
+				t.Fatal(e)
+			}
+			var st syscall.Stat_t
+			if e := syscall.Lstat(path, &st); e != nil {
+				t.Fatal(e)
+			}
+			if st.Uid != uint32(os.Geteuid()) || st.Gid != uint32(os.Getegid()) {
+				t.Fatalf("setgid fixture owner/group: uid=%d gid=%d, want uid=%d gid=%d", st.Uid, st.Gid, os.Geteuid(), os.Getegid())
+			}
+		}
 		if e := os.Chmod(path, mode); e != nil {
 			t.Fatal(e)
 		}
+		st, e := os.Lstat(path)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if st.Mode() != mode {
+			t.Fatalf("unsafe-mode fixture precondition: got %v, want %v", st.Mode(), mode)
+		}
+		t.Logf("unsafe-mode fixture established: %v", st.Mode())
 		if _, e := NewStaticPeerResolver(path, testPolicyVersion); e == nil {
 			t.Fatalf("unsafe mode %v accepted", mode)
 		}
@@ -218,14 +252,14 @@ func TestStaticPolicyFileCustody(t *testing.T) {
 			t.Fatal("unsafe path accepted", p)
 		}
 	}
-	alias := filepath.Join(t.TempDir(), "alias")
+	alias := filepath.Join(staticTestDir(t), "alias")
 	if e := os.Symlink(path, alias); e != nil {
 		t.Fatal(e)
 	}
 	if _, e := NewStaticPeerResolver(alias, testPolicyVersion); e == nil {
 		t.Fatal("file symlink accepted")
 	}
-	parent := filepath.Join(t.TempDir(), "parent")
+	parent := filepath.Join(staticTestDir(t), "parent")
 	if e := os.Symlink(filepath.Dir(path), parent); e != nil {
 		t.Fatal(e)
 	}
@@ -239,7 +273,7 @@ func TestStaticPolicyFileCustody(t *testing.T) {
 	if _, e := NewStaticPeerResolver(path, testPolicyVersion); e == nil {
 		t.Fatal("multiple hard links accepted")
 	}
-	fifo := filepath.Join(t.TempDir(), "fifo")
+	fifo := filepath.Join(staticTestDir(t), "fifo")
 	if e := syscall.Mkfifo(fifo, 0600); e != nil {
 		t.Fatal(e)
 	}

@@ -21,7 +21,8 @@ type peerIdentity struct {
 }
 
 // UnixConnContext is for http.Server.ConnContext on a dedicated Unix listener.
-// It captures SO_PEERCRED from the actual accepted *net.UnixConn. Unknown/wrapped
+// It captures kernel peer credentials from the accepted *net.UnixConn
+// (SO_PEERCRED on Linux, LOCAL_PEERCRED on Darwin). Unknown/wrapped
 // connections and extraction failures install a refusal marker, never a UID zero
 // default, address-derived identity or header fallback. Preserve this returned
 // context if the integrator composes additional ConnContext hooks.

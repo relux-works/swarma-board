@@ -40,8 +40,8 @@ type staticPolicy struct {
 // publisher. Only the kernel UID is an identity input. All processes sharing
 // that UID are one trust unit, with one explicit board account and grant set.
 // The accepted snapshot is immutable and every method checks file integrity.
-// It is safe for concurrent requests. Linux is the only supported platform;
-// other platforms refuse construction until their custody path is qualified.
+// It is safe for concurrent requests. Linux and Darwin have custody paths;
+// other platforms refuse construction. Darwin native qualification is separate.
 // Construct once per service lifetime; never reconstruct to recover from drift.
 type StaticPeerResolver struct {
 	mu       sync.Mutex
