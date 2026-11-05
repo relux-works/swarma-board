@@ -1,8 +1,8 @@
 # P0 baseline provenance and handoff
 
-This is the local P0 root candidate for `relux-works/swarma-board`, unit
-A2-261105-014-board-baseline, authored by producer `agents2_swarma_dev3`.
-It is pending separate independent Muse review, checks and keeper-controlled PR
+This is the local P0 root candidate for `relux-works/swarma-board`,
+authored by the baseline integrator.
+It is pending separate independent review, checks and release-coordinator-controlled PR
 publication/landing. This candidate is not a release or production adapter.
 
 ## Source custody
@@ -31,7 +31,7 @@ instructions/code were outside scope.
 ## Architecture custody
 
 The four architecture handoffs were copied byte-for-byte from the assigned
-workbench inputs; they remain normative candidate documents, not an immutable
+architecture inputs; they remain normative candidate documents, not an immutable
 upstream platform contract:
 
 - `contract.md`: SHA256 `37ccc80bb52dcd5d7af86ae7da5a141067c95021f0422b56b5f6a5ce0e0314c0`.
@@ -46,7 +46,7 @@ Only optional review/task_class and absent estimate scale use omitempty.
 `error.go` implements the required error method without adapter dependencies.
 
 The architecture mentions `inputs/spec.md` A01–A15, but no spec.md was supplied
-to this P0 workbench. No complete A01–A15 qualification is claimed by P0.
+to this P0 baseline unit. No complete A01–A15 qualification is claimed by P0.
 
 ## Frozen shared base for P1–P4
 
@@ -76,8 +76,8 @@ composition, listener or command stub is implemented before P5.
 
 Shared files have one writer: baseline-integrator. P1–P4 must propose shared
 contract/dependency changes to that owner and work only in their assigned paths.
-The keeper releases them from the exact signed P0 head in the bundle, without
-waiting for a destination main. The keeper owns any administrative empty base,
+The release coordinator releases them from the exact signed P0 head in the bundle, without
+waiting for a destination main. The release coordinator owns any administrative empty base,
 PR publication and review/landing workflow; this root candidate has no parents.
 
 ## Remaining gates
@@ -89,12 +89,12 @@ and fail-closed unconfigured hooks. A build-only external probe verifies all fiv
 pinned dependencies compile together; no dependency API/provider is invoked.
 They do not establish HTTP, storage atomicity, graph, CLI, archive-security or
 production qualification. P1–P4 and integrated P5 acceptance remain real work.
-Production auth U1, real sanitized snapshot custody, independent Muse review,
+Production auth U1, real sanitized snapshot custody, independent review,
 required checks, signed landing and owner cutover authorization remain held.
 
 ## P5 composition delta
 
-P5 producer agents2_swarma_dev3 composes its own isolated clone from signed P0
+The P5 integrator composes an isolated clone from signed P0
 6a0b65cc88787117ace16ba59a2560d70af63461, with exact immutable P2
  afe86ab441251acd23e5ce666527765f3b7507bc, P3
 6001a5d77849c12d14a9814c1cc21d5e2972c2b1 and P4
@@ -103,9 +103,10 @@ attribution remain intact. P5 writes only its assigned shared module, contract,
 app/cmd/integration and provenance paths. P3's proposed pflag v1.0.9 indirect
 module declaration is applied centrally; existing go.sum suffices.
 
-The original P0 architecture hashes above describe the immutable baseline.
+The original P0 architecture hashes above describe the immutable baseline,
+not the current documents after subsequent semantic and provenance edits.
 P5 appends approved D6 semantics and updates companion decision/ownership/task
-records under the root assignment's Meta+lead agreement. No upstream platform
+records under the approved integration requirements. No upstream platform
 API is claimed. P5 consulted the orchestrator's specification for acceptance
 coverage; its historical proposed status does not supersede the frozen contract.
 
@@ -120,7 +121,7 @@ reuse, production adapter, real import or source cutover is inferred.
 P5 never fetches or modifies source product code/live data; LICENSE/NOTICE and
 shared synthetic fixtures stay byte-identical to P0. No independent review,
 main landing, push, production deployment or external notification is performed.
-Original tb-keeper notification/disposition belongs to root before adoption.
+Original source-custodian notification/disposition belongs to the integration coordinator before adoption.
 
 Completed P1 was consumed only after its final receipt at
 2026-11-05T15:53:08Z: signed head d73e16961f4b10d4806b8b128194d8c64989909c,
@@ -143,26 +144,26 @@ The real Unix listener captures the shared current kernel UID; the injected
 resolver, Bearer fixture and TLS certificate are explicitly synthetic. No
 per-agent isolation, production adapter, remote custody or signed audit-export
 qualification is inferred. Existing audit schema stays unchanged, its migration
-remains HELD, and maintenance-package ownership remains with dev15. Original
+remains HELD, and maintenance-package ownership remains with the maintenance component owner. Original
 49931945 candidate/output remain immutable; transport evidence is separate.
 
 Offline maintenance successor continues exact transport head
 352aedf5acac1ee058a36c26befe7916aa48186f and imports only the four unchanged
-`internal/maintenance` files from dev15's completed signed component
+`internal/maintenance` files from the maintenance producer's completed signed component
 37d189daecdeb98c862925c44c02f4acdf82bc20. Its frozen P2 successor and P4 bases
 match this composition. The completed result, bundle and integration contract
 are copied into a separate immutable handoff input directory; no moving peer
 worktree is consumed or written. All P1/P2/P3/P4/shared package bytes remain
 unchanged. P5 owns app dispatch, private no-replace publication, CLI process
-qualification and documentation. Dev15 retains maintenance-package authorship.
+qualification and documentation. The maintenance producer retains maintenance-package authorship.
 
 Only synthetic temporary databases are used. Schema-v1 remains unchanged; no
 v2 history, signature authority, keys, production Source APIs or protected
 identity policy is invented. The CLI records an unsigned manifest with exact
 build identity, coherent snapshot/journal hashes and v1 revision range. Git SSH
-signatures apply only to local source candidates. Meta196 removes the Swarma
-authorship hold; task-specific Source custody, Curator key hold, independent
-Muse review/checks and authorized signed landing remain pending. Existing
+signatures apply only to local source candidates. The authorship hold was removed;
+task-specific source custody, external key-custody hold, independent
+review/checks and authorized signed landing remain pending. Existing
 output and output-transport-r2 artifacts are preserved byte-for-byte, with this
 successor's evidence in output-maintenance-r3. No push or live activation occurs.
 
@@ -176,14 +177,14 @@ objects are preserved as merge ancestors: static0600 policy
 handoff documents remain byte-identical. P5 adapts the proposed app helper and
 owns explicit CLI dispatch, the independent policy-version release pin, static
 resolver/catalog binding, stdout status routing and final-binary acceptance.
-No module/shared-interface/Curator specification or schema changes occur.
+No module/shared-interface/external platform specification or schema changes occur.
 
 The deployment profile is single-trust-unit, UDS-only, with the exact shared
-kernel UID mapped through the frozen release-static policy. A2-035/A2-036 remain
-production blockers, not dependencies of this candidate's integration checks.
+kernel UID mapped through the frozen release-static policy. O/S/C principals and UID-helper, and the protected per-request policy publisher
+remain production blockers, not dependencies of this candidate's integration checks.
 Offline exports remain explicitly unsigned; the external signer/verifier seams
 are available without a real signing adapter, key discovery or custody claim.
 Native v1 is retained; no speculative v2 target is adopted. Packaging/lifecycle
-belong to agents2 board orchestrator. Only temporary synthetic state is used.
+belong to board service orchestrator. Only temporary synthetic state is used.
 Prior output directories remain immutable; evidence goes to output-stage1-r4.
-Independent Muse review and Source-controlled signed landing remain separate.
+Independent review and source-owner-controlled signed landing remain separate.

@@ -4,19 +4,17 @@ This candidate adds only `internal/deployment/**` and this documentation. **The
 binaries at transport base 352aedf5 are NOT wired for this profile.** No binary
 behavior, static-policy adapter, production admission, signed landing, real
 adoption or live activation is claimed here. Apply the constructor patch proposal
-only after merging dev3's maintenance dispatch; bind dev8's independently reviewed
+only after merging the integrator's maintenance dispatch; bind the static-policy owner's independently reviewed
 static policy adapter at the indicated seam. Do not replace either producer's work.
 
-Authority: the saved `board-stage1-meta.jsonl` decision at 2026-11-05T16:12:33Z
-and `board-stage1-ratification.jsonl` at 16:18:19Z ratify first dogfood under the
+The first-deployment requirements constrain first dogfood to the
 shared agent UID, no per-agent isolation, UDS only, static owner-private 0600
-release policy, and agents2 board orchestrator lifecycle ownership. A2-035
-(O/S/C principals + UID-helper) and A2-036 (protected per-request publisher)
+release policy, and board service orchestrator lifecycle ownership. O/S/C principals + UID-helper and a protected per-request policy publisher
 block production. This implementation has no mechanism to mark them satisfied.
 A later independently reviewed implementation and owner admission are required;
 adding a production enum or setting booleans does not discharge those gates.
 
-## Exact command contract proposed for dev3/integrator
+## Exact command contract proposed for the integrator
 
 Add flags to the app entry dispatch, leaving product query syntax and the
 existing explicit synthetic TLS qualification path intact:
@@ -27,14 +25,14 @@ existing explicit synthetic TLS qualification path intact:
 | `--deployment-status` | Both binaries: require explicit profile, no other operation/config arguments, write `deployment.WriteStatus(profile, stdout)`, exit 0. Static capabilities only; not a live readiness result. The existing server app output is stderr, so route this special status output explicitly to stdout in the entry dispatcher. |
 | server `--unix-socket=/absolute/run/board.sock` | `Config.Endpoint = "unix://" + value`; use `Config` validation then `app.ListenUnix`. |
 | server `--data-dir=/absolute/data` | `Config.DataDir`; only `registry.New` opens/creates it. |
-| server `--policy-file=/absolute/policy/release.json` | `Config.PolicyFile`; pass to dev8 loader after `Validate`; never the synthetic bearer fixture loader. |
-| server `--audit-export-dir=/absolute/exports` | `Config.ExportDir`; separate offline evidence destination. This flag creates nothing and does not invoke export/signing. Bind dev3's explicit offline output path under the same disjointness policy. |
+| server `--policy-file=/absolute/policy/release.json` | `Config.PolicyFile`; pass to the static-policy owner's loader after `Validate`; never the synthetic bearer fixture loader. |
+| server `--audit-export-dir=/absolute/exports` | `Config.ExportDir`; separate offline evidence destination. This flag creates nothing and does not invoke export/signing. Bind the integrator's explicit offline output path under the same disjointness policy. |
 | client `--deployment-projection=/absolute/projection.json` | Explicit bounded three-field projection loader, no credential fd; freeze the resolved value once. `NewClientTransport(profile, projection)` binds its Unix endpoint. This profile supplies no endpoint from home/cwd/environment. |
 
 Reject duplicates (including empty-first-then-value), empty explicit values,
 unknown flags, mixed deployment/synthetic flags, and positional server args.
 Reject deployed invocation lacking a profile before writes. `--deployment-status`
-with no profile exits 2; `production` exits 2 with both A2-035/A2-036 diagnostics.
+with no profile exits 2; `production` exits 2 with both O/S/C principals and UID-helper, and protected per-request policy publisher diagnostics.
 No `--force`, `--production-ready`, admission override or gate-success bits.
 The legacy synthetic qualification entry remains reachable only through its
 explicit synthetic inputs; it is not a default deployed profile.
@@ -49,9 +47,9 @@ and independently qualified; none are used in this profile.
 ## Small constructor patch proposal
 
 `app-wiring.patch` proposes one NEW app helper file. It is a review artifact,
-not an applied change to dev3's active app files. It is based on the exact
+not an applied change to the integrator's active app files. It is based on the exact
 transport352aedf5 constructors, with no dependency/module/shared-interface delta.
-The entry dispatcher remains dev3/integrator-owned: parse the flags above and
+The entry dispatcher remains the integrator-owned: parse the flags above and
 call the helpers in the following order:
 
 1. Handle the status-only form through `deployment.WriteStatus`. Status emits no
@@ -59,10 +57,10 @@ call the helpers in the following order:
 2. For server startup call `deployment.Validate(c)` **before** reading policy or
    writing anything. On error exit 2 (configuration), printing only the bounded
    error. `Validate` is read-only and does not load or bless a policy.
-3. Bind dev8's loader to an adapter with `auth.ProtectedPeerResolver` and the
+3. Bind the static-policy owner's loader to an adapter with `auth.ProtectedPeerResolver` and the
    explicit authorized provisioning project list. Verify the static release
    policy is owned by the expected UID, regular, nonsymlink, exactly 0600, valid,
-   complete and ready. Those checks and schema belong to dev8, not this module.
+   complete and ready. Those checks and schema belong to the static-policy owner, not this module.
    Pass the validated `Plan`, adapter, projects and exact build commit into
    `serveSingleTrustUnit`. A missing/unready adapter must refuse before storage;
    no fake resolver, bearer fixture or inferred current-UID grant in this branch.
@@ -82,11 +80,11 @@ call the helpers in the following order:
    matching Unix transport and nil credentials to `cli.Run`. The projected
    AccountID is only a preflight expectation; SO_PEERCRED and policy establish
    the one shared-UID identity. Never infer per-agent identities.
-7. Dispatch dev3 offline maintenance before normal serve parsing, while retaining
+7. Dispatch the integrator's offline maintenance before normal serve parsing, while retaining
    its exclusive read-only locks, explicit paths and signer custody requirements.
    This profile does not start maintenance or permit signing with the bot key.
 
-This patch is not complete until those entry calls and the dev8 binding are
+This patch is not complete until those entry calls and the static-policy adapter binding are
 present in the actual `cmd`-reachable functions. A nil binding deliberately
 refuses. Host/board orchestrator owns start/stop/packaging; after draining, close
 storage. Never unlink an occupied socket, spawn/restart from the client, fall
@@ -106,12 +104,12 @@ a socket path may be absent or an existing socket (client/status validation),
 never a symlink/regular file. `ListenUnix` still refuses **every** occupied path,
 including a live or stale socket, and independently enforces parent ownership,
 private mode and inode-preserving cleanup. Mode/owner/readiness checks remain in
-the existing constructors and dev8 adapter. Validation cannot reserve paths or
+the existing constructors and the static-policy adapter. Validation cannot reserve paths or
 prevent a same-UID actor changing them afterward; it claims no isolation.
 
 Do not put policy/socket/export artifacts under the registry: it enumerates
 `.db` files plus its lock only. Keep policy, audit signer/trust custody and exports
-outside the data/runtime trees. Audit signer/trust custody remains dev3's
+outside the data/runtime trees. Audit signer/trust custody remains the integrator's
 separate decision/implementation; this descriptor does not imply a signed export.
 
 ## Exact acceptance evidence
@@ -122,11 +120,11 @@ immutable config snapshots, no-dial construction, endpoint binding and safe JSON
 A constructor test uses the REAL app Unix listener/kernel peer hook, registry,
 HTTP readiness and client preflight with a clearly FAKE shared-UID resolver. It
 proves both authority and storage failure stay 503 with the descriptor present,
-and Unix client preflight never consumes a credential. It does not qualify dev8.
+and Unix client preflight never consumes a credential. It does not qualify the static-policy adapter.
 
 After wiring, build both actual final entry points with the exact 40-hex candidate
 commit stamp and run `binary_acceptance.py` as documented in its help. Supply a
-**synthetic** dev8 policy fixture for the current nonprivileged UID, one project
+**synthetic** static-policy fixture for the current nonprivileged UID, one project
 and one account, never a live release policy. The script uses only private temp
 paths and exits 1 against the current unwired base. It verifies both actual
 binaries' descriptor/status, production and missing-profile refusal, invalid
@@ -135,14 +133,14 @@ preflight, auth-readiness refusal on policy mode loss, dead-service refusal and
 no resurrection. It must be run by the integrator against the final binary pins;
 Python syntax checks or constructor tests do not satisfy this gate.
 
-Additional integrator gates: retain existing remote TLS tests/builds; dev8's
-mode/owner/malformed/unknown-UID/revocation tests (including keep-alive); dev3's
+Additional integrator gates: retain existing remote TLS tests/builds; the static-policy owner's
+mode/owner/malformed/unknown-UID/revocation tests (including keep-alive); the integrator's
 read-only export tests and signer trust tests. Inspect final diff for no spawn,
 write retry, local board fallback or alternate live listener. Distinct-UID/UID
-helper/publisher, independent Muse review, Source landing, custody/adoption and
+helper/publisher, independent review, Source landing, custody/adoption and
 owner cutover approval remain external gates. No privileged UID/mode experiment
 or real deployment is required or authorized by this handoff.
 
-Implementation attribution: agents2_swarma_dev10, model `gpt-6.1-sol`. Local
-candidate author/signing identity: Relux Zion. Independent Muse review and
-Source-authorized landing remain required. No push or activation is authorized.
+Implementation responsibility: deployment profile owner. Local
+candidate signing uses the release bot identity. Independent review and
+source-owner-authorized landing remain required. No push or activation is authorized.

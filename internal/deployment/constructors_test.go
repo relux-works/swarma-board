@@ -19,7 +19,7 @@ import (
 )
 
 // This is constructor qualification with a FAKE shared-UID resolver. It proves
-// composition compatibility only, never dev8 policy custody or binary wiring.
+// composition compatibility only, never static policy custody or binary wiring.
 type credentialFunc func(context.Context, contract.Projection) (string, error)
 
 func (f credentialFunc) Bearer(ctx context.Context, p contract.Projection) (string, error) {

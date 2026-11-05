@@ -263,7 +263,7 @@ func TestMaintenanceExecutableUnsignedReadOnlyReimportAndRefusal(t *testing.T) {
 	if err = compatible.Close(); err != nil {
 		t.Fatal(err)
 	}
-	// Evidence capture is opt-in and writes only into this workbench's new output.
+	// Evidence capture is opt-in and writes only into this test's new output.
 	if evidence := os.Getenv("MAINTENANCE_CLI_EVIDENCE_DIR"); evidence != "" {
 		if err = os.Mkdir(evidence, 0700); err != nil {
 			t.Fatal(err)

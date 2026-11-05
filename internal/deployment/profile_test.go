@@ -18,7 +18,7 @@ import (
 
 func config(t *testing.T) deployment.Config {
 	t.Helper()
-	// Keep AF_UNIX paths short even on long workbench paths.
+	// Keep AF_UNIX paths short even on long checkout paths.
 	root, err := os.MkdirTemp("", "bd-")
 	if err != nil {
 		t.Fatal(err)
@@ -43,14 +43,14 @@ func TestExplicitSelectionAndProductionCannotBeEnabled(t *testing.T) {
 		}
 	}
 	_, err := deployment.Describe("production")
-	if !errors.Is(err, deployment.ErrProductionGated) || !strings.Contains(err.Error(), "A2-035") || !strings.Contains(err.Error(), "A2-036") {
+	if !errors.Is(err, deployment.ErrProductionGated) || !strings.Contains(err.Error(), "O/S/C principals and UID-helper") || !strings.Contains(err.Error(), "protected per-request policy publisher") {
 		t.Fatal(err)
 	}
 	d, err := deployment.Describe(deployment.SingleTrustUnit)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d.Profile != "single-trust-unit" || d.PerAgentIsolation || d.ProductionAdmitted || d.ClientSelfSpawn || d.ClientAutoRecovery || d.RemoteTLSActivation || !d.RemoteTLSQualificationSupported || d.Transport != "uds-only" || !strings.Contains(d.Identity, "no per-agent isolation") || d.LifecycleOwner != "agents2 board orchestrator" {
+	if d.Profile != "single-trust-unit" || d.PerAgentIsolation || d.ProductionAdmitted || d.ClientSelfSpawn || d.ClientAutoRecovery || d.RemoteTLSActivation || !d.RemoteTLSQualificationSupported || d.Transport != "uds-only" || !strings.Contains(d.Identity, "no per-agent isolation") || d.LifecycleOwner != "board orchestrator" {
 		t.Fatalf("unsafe descriptor %+v", d)
 	}
 	d.ProductionBlockers[0] = "caller mutation"

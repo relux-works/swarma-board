@@ -82,9 +82,9 @@ algorithm and custody; authorized sanitized data, source notification dispositio
 and cutover/reconciliation authority. Schema-v1 bytes are preserved; version,
 project and digest-bearing persistence remain HELD. `internal/maintenance/**`
 belongs to the independent maintenance producer and is consumed unchanged.
-Independent Muse review/checks and authorized signed landing remain required.
-Meta196 removed the Swarma authorship hold; the task-specific Source gate and
-Curator key hold remain in effect.
+Independent review/checks and authorized signed landing remain required.
+The authorship hold was removed; the task-specific source-custody gate and
+external key-custody hold remain in effect.
 
 ### Offline maintenance command (unsigned synthetic qualification)
 
@@ -106,7 +106,7 @@ The inherited read-only bbolt lock additionally refuses an active writer after
 about two seconds; cancellation cannot shorten lock acquisition. No board CLI
 fallback, HTTP route, stop, spawn, restore or resume operation is added.
 
-`internal/maintenance` is consumed byte-for-byte from dev15's completed signed
+`internal/maintenance` is consumed byte-for-byte from the maintenance producer's completed signed
 `37d189daecdeb98c862925c44c02f4acdf82bc20`. It reads a single coherent schema-v1
 ExportView and closes its read-only handle after encoding. App composition then
 validates canonical manifest/journal bytes, native-v1 content and exact sizes and
@@ -121,7 +121,7 @@ syncs files and directory, then uses Linux amd64 `renameat2(RENAME_NOREPLACE)`
 relative to the retained parent descriptor and syncs the parent. Existing files,
 directories and symlinks refuse; unsupported no-replace operations fail closed.
 There is no overwrite-capable rename fallback. Other platforms are unqualified.
-This filesystem code is a producer candidate pending independent Muse review;
+This filesystem code is a producer candidate pending independent review;
 fault/power-loss recovery has not been qualified. Process death can leave private
 `.maintenance-incomplete-*` staging; the Host owns inspection/retention. A parent
 sync failure after rename returns failure even though a complete output may be
@@ -144,7 +144,7 @@ wrong project and occupied output refusals. Native reimport starts a new local
 revision-1 audit history; it never replays the exported journal or resumes the
 source. Existing actual Unix/TLS integration tests continue unchanged. These
 witnesses do not qualify a production source, signature, UID policy or cutover.
-Artifact limits are inherited from dev15 and frozen P2/P4; they do not provide a
+Artifact limits are inherited from the maintenance producer and frozen P2/P4; they do not provide a
 total process-memory bound or a raw-state preallocation bound.
 
 
@@ -153,7 +153,7 @@ total process-memory bound or a raw-state preallocation bound.
 Both binaries accept `--deployment-profile=single-trust-unit --deployment-status`
 and emit the same safe static JSON descriptor on stdout. Status opens no policy,
 storage or listener and is not live readiness. `production` always refuses with
-both A2-035/A2-036 diagnostics. No admission override exists.
+both O/S/C principals and UID-helper, and protected per-request policy publisher diagnostics. No admission override exists.
 
 Server startup requires all of the following explicit inputs (absolute paths):
 
@@ -209,6 +209,6 @@ hash/source preservation, occupied-output/import refusal and dead-service
 no-resurrection. Run it against both exact stamped final binaries with a
 synthetic current-UID policy and a NEW evidence directory. Full Go/race/vet,
 legacy Unix/TLS, native-v1 restore and dedicated SSHSIG tests remain required.
-Packaging, installation and lifecycle belong to agents2 board orchestrator.
-Independent Muse review/checks, Source landing and production custody/adoption
-remain separate. A2-035/A2-036 do not block this synthetic integration packet.
+Packaging, installation and lifecycle belong to board service orchestrator.
+Independent review/checks, Source landing and production custody/adoption
+remain separate. O/S/C principals and UID-helper, and the protected per-request policy publisher do not block this synthetic integration packet.

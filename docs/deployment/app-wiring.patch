@@ -21,7 +21,7 @@ new file mode 100644
 +	"github.com/relux-works/swarma-board/internal/registry"
 +)
 +
-+// PROPOSAL: entry parsing and dev8 adapter loading are integrator-owned. Call
++// PROPOSAL: entry parsing and static policy adapter loading are integrator-owned. Call
 +// deployment.Validate before loading the adapter, then supply its actual grants.
 +func serveSingleTrustUnit(ctx context.Context, plan deployment.Plan,
 +	resolver auth.ProtectedPeerResolver, projects []contract.Project,

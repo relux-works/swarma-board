@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "unit": "A2-261105-014-board-architecture",
-  "architect": "agents2_swarma_dev10",
+  "unit": "board-architecture",
+  "architect": "architecture owner",
   "source_commit": "09bac3d89822c9b83c04dff6483d7b2074097a82",
   "destination_module": "github.com/relux-works/swarma-board",
   "status": "architect-agreed-implementation-proposal-pending-independent-review-and-owner-landing",

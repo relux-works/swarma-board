@@ -12,7 +12,7 @@ import (
 
 // Config is explicit input, not discovered configuration. ExportDir is the
 // separate offline evidence destination, never registry state or a native import
-// target. PolicyFile is passed to dev8's static-0600 adapter; this package does
+// target. PolicyFile is passed to the static-0600 adapter; this package does
 // not parse it or establish its authority. TCP/TLS inputs are represented only
 // so a merged CLI configuration cannot silently ignore activation requests.
 type Config struct {

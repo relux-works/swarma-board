@@ -22,7 +22,7 @@ const DescriptorHeader = "Swarma-Board-Deployment"
 var (
 	ErrProfileRequired = errors.New("deployment: explicit profile required")
 	ErrUnknownProfile  = errors.New("deployment: unknown profile")
-	ErrProductionGated = errors.New("deployment: production refused; A2-035 O/S/C principals and UID-helper, and A2-036 protected per-request policy publisher remain required")
+	ErrProductionGated = errors.New("deployment: production refused; O/S/C principals and UID-helper, and protected per-request policy publisher remain required")
 	ErrConfig          = errors.New("deployment: invalid or overlapping deployment configuration")
 )
 
@@ -56,9 +56,9 @@ func Describe(profile string) (Descriptor, error) {
 		return Descriptor{
 			Profile: SingleTrustUnit, Use: "first-dogfood", Transport: "uds-only",
 			Identity:                        "shared-agent-uid; no per-agent isolation",
-			ProductionBlockers:              []string{"A2-035: O/S/C principals and UID-helper", "A2-036: protected per-request policy publisher"},
+			ProductionBlockers:              []string{"O/S/C principals and UID-helper", "protected per-request policy publisher"},
 			Policy:                          "release-static-owner-private-0600",
-			LifecycleOwner:                  "agents2 board orchestrator",
+			LifecycleOwner:                  "board orchestrator",
 			RemoteTLSQualificationSupported: true,
 		}, nil
 	default:

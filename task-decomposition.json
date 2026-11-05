@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "unit": "A2-261105-014-board-architecture",
-  "architect": "agents2_swarma_dev10",
+  "unit": "board-architecture",
+  "architect": "architecture owner",
   "source_commit": "09bac3d89822c9b83c04dff6483d7b2074097a82",
   "destination_module": "github.com/relux-works/swarma-board",
   "status": "architect-agreed-implementation-proposal-pending-independent-review-and-owner-landing",
@@ -206,22 +206,22 @@
     },
     {
       "id": "G1",
-      "title": "Independent Muse review, checks and authorized signed landing",
-      "owner": "orchestrator + independent Muse + authorized lander",
+      "title": "Independent review, checks and authorized signed landing",
+      "owner": "orchestrator + independent reviewer + authorized lander",
       "blocked_by": [
         "P5"
       ],
       "state": "external-gate",
       "inputs": [
-        "muse-wonder-full-1.0-contributor xhigh independent staffing",
+        "separately assigned independent reviewer",
         "PR/checks and exact owner landing grant"
       ],
       "outputs": [
         "independent review findings/resolution and checks",
-        "SSH-signed Relux Zion bot landing evidence"
+        "SSH-signed release bot landing evidence"
       ],
       "acceptance": [
-        "No Codex independent review ACCEPT and no owner-identity signing."
+        "No independent review acceptance from the implementation system and no owner-identity signing."
       ],
       "acceptance_ids": []
     },
@@ -312,7 +312,7 @@
   "deferred_followup": "New product skill after accepted interface/dogfood; no copied legacy usage instructions or artificial task inflation.",
   "approved_semantic_delta": {
     "contract": "contract.md D6",
-    "authority": "Meta+lead agreement reported in root P5 assignment",
+    "authority": "approved integration requirements",
     "implementation": "synthetic current; follow-up server/client/root assignments in immutable output/contract-delta.md",
     "gates": [
       "Host UID/runtime/mapping",

@@ -1,12 +1,11 @@
 # First-deployment static peer policy candidate
 
-Producer: `agents2_swarma_dev8`; model attribution: `gpt-6.1-sol`.
+Implementation responsibility: static-policy adapter owner.
 Base: `352aedf5acac1ee058a36c26befe7916aa48186f` (completed board transport).
-Authority: Meta `$tGhhRa-pMztng8cN6C4LC1GDygKjMf-S-xjYcfu2Xbo`, ratification
-`$0e_AYbf67cTmBokAorOdDXX15l-F1h2rLled2_YQqI4`.
+Authority: approved first-deployment requirements described below.
 
 This is a candidate operator format and package-local implementation of the
-existing `ProtectedPeerResolver`, pending independent Muse review and Source
+existing `ProtectedPeerResolver`, pending independent review and Source
 landing. It introduces no platform API, publisher, production policy, real data
 import, command flags, listener activation or shared contract change. Existing
 binaries still expose their synthetic startup paths. The integrator owns the
@@ -16,8 +15,8 @@ The first mode is Linux, UDS-only, `sharedUID`, `single-trust-unit`. Service and
 clients use the same effective OS UID. Every process with that UID obtains the
 same board account and grants. Mode 0600 provides no per-agent isolation and
 cannot keep policy from other processes sharing the owner UID. Separate O/S/C
-principals remain a tracked production-admission gate under the ratification.
-A2-036 tracks the later protected per-request publisher. This adapter never
+principals remain a tracked production-admission gate under these requirements.
+The protected per-request policy publisher remains a later production dependency. This adapter never
 refreshes grants from disk during a service lifetime.
 
 ## Exact operator format
@@ -171,5 +170,5 @@ New tests include strict format/custody/grants/latching, concurrent checks under
 the race detector, and a real shared-UID Unix HTTP keep-alive drift witness with
 no board storage/import. This does not qualify foreign-UID provisioning,
 per-agent isolation, non-Linux activation, a protected publisher, production
-load, release custody, signer custody or live deployment. Independent Muse
+load, release custody, signer custody or live deployment. Independent
 review, Source landing and remaining production-admission gates still apply.

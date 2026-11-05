@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Integrator final-binary synthetic gate, derived from the frozen deployment handoff.
 
-Example (integrator supplies synthetic dev8 schema, current UID, one admin grant):
+Example (integrator supplies synthetic protected-policy schema, current UID, one admin grant):
  GOMAXPROCS=2 python3 docs/deployment/binary_acceptance.py \
    --server /abs/final/swarma-board-server --client /abs/final/swarma-board \
-   --policy-fixture /abs/synthetic-dev8-policy.json \
+   --policy-fixture /abs/synthetic-policy.json \
    --project synthetic-board --account shared-agent --commit <40-hex-final-pin>
 
 Uses private temporary paths, synthetic records, current nonprivileged UID only.
@@ -34,9 +34,9 @@ EXPECTED = {
     "identity": "shared-agent-uid; no per-agent isolation",
     "per_agent_isolation": False,
     "production_admitted": False,
-    "production_blockers": ["A2-035: O/S/C principals and UID-helper", "A2-036: protected per-request policy publisher"],
+    "production_blockers": ["O/S/C principals and UID-helper", "protected per-request policy publisher"],
     "policy": "release-static-owner-private-0600",
-    "lifecycle_owner": "agents2 board orchestrator",
+    "lifecycle_owner": "board orchestrator",
     "client_self_spawn": False,
     "client_auto_recovery": False,
     "remote_tls_qualification_supported": True,
@@ -159,7 +159,7 @@ def main():
         run(binary, ["--deployment-profile=unknown", "--deployment-status"], 2)
         refused = run(binary, ["--deployment-profile=production", "--deployment-status"], 2)
         diagnostic = refused.stdout + refused.stderr
-        assert "A2-035" in diagnostic and "A2-036" in diagnostic, "production gate diagnostics missing"
+        assert "O/S/C principals and UID-helper" in diagnostic and "protected per-request policy publisher" in diagnostic, "production gate diagnostics missing"
         run(binary, ["--deployment-profile=" + PROFILE, "--deployment-profile=" + PROFILE, "--deployment-status"], 2)
         run(binary, ["--deployment-profile=", "--deployment-profile=" + PROFILE, "--deployment-status"], 2)
 
@@ -206,7 +206,7 @@ def main():
             try:
                 deadline = time.monotonic() + 5
                 while True:
-                    assert process.poll() is None, "final server refused valid synthetic dev8 policy"
+                    assert process.poll() is None, "final server refused valid synthetic policy"
                     try:
                         status, _ = request(sock, "/ready")
                         if status == 200:

@@ -11,7 +11,7 @@ import (
 // authority. Every method must consult accepted policy (including disabled
 // accounts, UID mappings and grants). First deployment uses StaticPeerResolver:
 // its release snapshot stays fixed and detected drift requires restart. A future
-// protected publisher (A2-036) supplies live revocations. ResolvePeer must refuse
+// protected per-request policy publisher supplies live revocations. ResolvePeer must refuse
 // unknown/disabled/unmapped UIDs; Require and
 // Projects must recheck current account status and grants, without caching them for
 // the lifetime of a connection. Implementations must support concurrent requests.
