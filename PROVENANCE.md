@@ -129,3 +129,19 @@ Exact constructors are query.New(), domain.New(repository, clock, ID generator)
 and domain.RandomID(type, time). P5 delegates ID generation to that helper and
 retains domain collision checks inside the transaction. No unfinished/floating
 P1 code or another identity's credential was consumed.
+
+Transport successor composition consumes exact completed signed server
+7c956e89aacfc805fc593965ce2689dd18dee140 (bundle SHA256
+724dc39e6140e5b2c69cc1d35dee6d3c1dfffebce4c355b1840e07d7c7469485)
+and client 23247905d9c74a6cf84ddc7f6c18b774d336e492 (bundle SHA256
+973db2d52e63779e912b1c7be17f2e3c82c705801ca21552dc1e904872ab438f).
+Their owned packages are incorporated byte-for-byte, with unchanged P1/P4 and
+shared Go interfaces/native fixtures/dependencies. Revised spec SHA256 is
+6c8c4d5b22aaef64f10e910c49e68ba2489885d3f02adb2645d420de63e7af45.
+New code is confined to app/cmd/integration and this provenance record.
+The real Unix listener captures the shared current kernel UID; the injected
+resolver, Bearer fixture and TLS certificate are explicitly synthetic. No
+per-agent isolation, production adapter, remote custody or signed audit-export
+qualification is inferred. Existing audit schema stays unchanged, its migration
+remains HELD, and maintenance-package ownership remains with dev15. Original
+49931945 candidate/output remain immutable; transport evidence is separate.

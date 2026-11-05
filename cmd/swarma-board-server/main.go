@@ -14,5 +14,5 @@ var commit = "dev"
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	os.Exit(app.RunSyntheticServer(ctx, os.Args[1:], commit, os.Stderr, app.ConcreteSynthetic))
+	os.Exit(app.RunServer(ctx, os.Args[1:], commit, os.Stderr))
 }

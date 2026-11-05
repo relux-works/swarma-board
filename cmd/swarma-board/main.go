@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/relux-works/swarma-board/internal/cli"
+	"github.com/relux-works/swarma-board/internal/app"
 )
 
 var commit = "dev"
@@ -14,5 +14,5 @@ var commit = "dev"
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	os.Exit(cli.Run(ctx, os.Args[1:], cli.Options{Commit: commit}))
+	os.Exit(app.RunClient(ctx, os.Args[1:], commit, os.Stdout, os.Stderr))
 }

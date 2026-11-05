@@ -252,3 +252,23 @@ Offline server maintenance export is separate from board CLI, public routes and 
 Before writer switch: record original tb-keeper extraction notification receipt or explicit owner disposition; obtain authorized sanitized snapshot/digest, custody/redaction/resource/assignee decisions; dry-run and import into NEW EMPTY target, reconcile fields/counts/IDs/edges/plans/exclusions and prove backup/restore. Freeze source writes, obtain/reconcile final checkpoint into a fresh target if source changed, then owners authorize exactly one writer after independent Muse review/checks/signed landing. No dual writes. Rollback stops new writes and captures a fresh post-cutover snapshot+journal checkpoint read-only, signed when approved custodian is available. Missing signer preserves explicitly UNSIGNED evidence and does not satisfy signed-export acceptance. Dead service recovery is Host offline recovery/consistent backup, never CLI spawning. Stale old writer stays disabled until all post-cutover mutations are reconciled and owners separately authorize resuming writes.
 
 D6 qualification: T1 real distinct UIDs/current keep-alive revocation/spoof refusal and explicit same-UID limitation; T2 equivalent facts/plans on Unix and verified remoteTLS, synthetic labeled; T3 dead service/mapping/TLS refusal with no spawn/fallback/retry; T4 atomic exact-one journal and unchanged old rows under CAS/fault/kill/restart; T5 bounded read-only coherent export and approved-trust signature/tamper tests; T6 final pre-switch reconciliation and fresh read-only rollback checkpoint retaining post-cutover mutation. Synthetic acceptance never closes Host/U1/signer/custody/cutover gates.
+
+### Transport successor implementation status (synthetic qualification)
+
+The composed successor uses the delivered package APIs, preserving shared Go
+interfaces. Local server composition installs `httpapi.UnixConnContext` on the
+actual accepted Unix connection and one `auth.NewPeerAuthorizer` for both
+`Authorizer` and `PeerAuthenticator`. Its resolver implements `ResolvePeer`,
+`Require`, `Projects`, `Ready`; production protected authority remains external.
+Remote TLS uses a separate Bearer handler without that hook. Client composition
+injects `*client.UnixTransport` from `client.NewUnixTransport(endpoint)`;
+`SyntheticHTTP` is an explicit test-only opt-in. The delivered internal Unix
+HTTP authority is `swarma-board.local`; it is never DNS-resolved or dialed over
+TCP. These concrete APIs supersede F1's proposed constructor names only.
+
+`store.AuditEvent` currently aliases existing v1 `AuditRecord`. `ExportView`
+returns coherent bounded v1 events, not the proposed digest-bearing v2 journal.
+Schema migration remains HELD; no missing historical fields are invented. The
+maintenance/export producer and external signing custody are separate work.
+New synthetic transport tests cannot satisfy distinct-UID T1, full v2 T4,
+approved-signer T5, production adoption or T6 cutover requirements.

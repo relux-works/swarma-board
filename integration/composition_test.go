@@ -90,12 +90,12 @@ func startFixture(t *testing.T, dir string, secure bool, data []byte) *harness {
 	return h
 }
 func (h *harness) options(role string) cli.Options {
-	return cli.Options{Projection: testadapter.Projection{Value: contract.Projection{Endpoint: h.server.URL, ProjectID: project, AccountID: "synthetic-" + role}}, Credential: credential("swarma-board-synthetic-" + role), TLSConfig: h.tls, Commit: build}
+	return cli.Options{Projection: testadapter.Projection{Value: contract.Projection{Endpoint: h.server.URL, ProjectID: project, AccountID: "synthetic-" + role}}, Credential: credential("swarma-board-synthetic-" + role), TLSConfig: h.tls, SyntheticHTTP: h.tls == nil, Commit: build}
 }
 func (h *harness) client(t *testing.T, role string) *client.Client {
 	t.Helper()
 	o := h.options(role)
-	c, e := client.New(context.Background(), o.Projection, o.Credential, client.Options{TLSConfig: o.TLSConfig})
+	c, e := client.New(context.Background(), o.Projection, o.Credential, client.Options{TLSConfig: o.TLSConfig, SyntheticHTTP: o.SyntheticHTTP})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -329,8 +329,8 @@ func TestDeadServiceAndMissingProductionAdaptersRefuse(t *testing.T) {
 	endpoint := "http://" + ln.Addr().String()
 	ln.Close()
 	var stdout, stderr bytes.Buffer
-	n := cli.Run(context.Background(), []string{"q", "count()"}, cli.Options{Projection: testadapter.Projection{Value: contract.Projection{Endpoint: endpoint, ProjectID: project, AccountID: "synthetic-admin"}}, Credential: credential("swarma-board-synthetic-admin"), Out: &stdout, Err: &stderr})
-	if n != 1 || stdout.Len() != 0 || !bytes.Contains(stderr.Bytes(), []byte("transport_error")) {
+	n := cli.Run(context.Background(), []string{"q", "count()"}, cli.Options{Projection: testadapter.Projection{Value: contract.Projection{Endpoint: endpoint, ProjectID: project, AccountID: "synthetic-admin"}}, Credential: credential("swarma-board-synthetic-admin"), SyntheticHTTP: true, Out: &stdout, Err: &stderr})
+	if n != 1 || stdout.Len() != 0 || !bytes.Contains(stderr.Bytes(), []byte("unavailable")) {
 		t.Fatalf("dead service: %d %s %s", n, &stdout, &stderr)
 	}
 	stdout.Reset()
@@ -414,7 +414,7 @@ func TestTwoProjectCLITaskFactsRemainIsolatedOnRestart(t *testing.T) {
 	admin := h.client(t, "admin")
 	o := h.options("admin")
 	o.Projection = testadapter.Projection{Value: contract.Projection{Endpoint: h.server.URL, ProjectID: "synthetic-other", AccountID: "synthetic-admin"}}
-	foreign, e := client.New(context.Background(), o.Projection, o.Credential, client.Options{})
+	foreign, e := client.New(context.Background(), o.Projection, o.Credential, client.Options{SyntheticHTTP: true})
 	if e != nil {
 		t.Fatal(e)
 	}
