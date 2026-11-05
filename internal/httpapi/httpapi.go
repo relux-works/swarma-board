@@ -46,14 +46,17 @@ type LogEvent struct {
 	AffectedCount               int
 }
 type Options struct {
-	Service      contract.Service
-	Parser       contract.Parser
-	Transfer     contract.Transfer
-	Authorizer   contract.Authorizer
-	StorageReady func(context.Context) error
-	Commit       string
-	Now          func() time.Time
-	Log          func(LogEvent)
+	Service    contract.Service
+	Parser     contract.Parser
+	Transfer   contract.Transfer
+	Authorizer contract.Authorizer
+	// PeerAuthenticator selects dedicated Unix-only auth. Authorizer still owns
+	// current role checks; compose both with the same protected peer adapter.
+	PeerAuthenticator PeerAuthenticator
+	StorageReady      func(context.Context) error
+	Commit            string
+	Now               func() time.Time
+	Log               func(LogEvent)
 }
 type Handler struct{ o Options }
 
@@ -72,10 +75,16 @@ func New(o Options) (*Handler, error) {
 	if nilInterface(o.Service) || nilInterface(o.Parser) || nilInterface(o.Transfer) || nilInterface(o.Authorizer) || o.StorageReady == nil {
 		return nil, &contract.Error{Code: "unavailable", Message: "required server dependency missing"}
 	}
+	if o.PeerAuthenticator != nil && nilInterface(o.PeerAuthenticator) {
+		return nil, problem("unavailable")
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if e := o.Authorizer.Ready(ctx); e != nil {
 		return nil, &contract.Error{Code: "unavailable", Message: "authorization unavailable"}
+	}
+	if o.PeerAuthenticator != nil && o.PeerAuthenticator.Ready(ctx) != nil {
+		return nil, problem("unavailable")
 	}
 	if o.Now == nil {
 		o.Now = time.Now
@@ -168,6 +177,10 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
 	if action == "import" || action == "export" {
 		event.Operation = action
 	}
+	if h.o.PeerAuthenticator != nil && len(r.Header.Values("Authorization")) != 0 {
+		writeError(w, id, problem("unauthorized"))
+		return
+	}
 	public := route == "/health" || route == "/ready" || route == "/v1/version"
 	var principal contract.Principal
 	if !public {
@@ -205,7 +218,7 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"status": "ok"})
 		return
 	case "/ready":
-		if h.o.StorageReady(ctx) != nil || h.o.Authorizer.Ready(ctx) != nil {
+		if h.o.StorageReady(ctx) != nil || h.o.Authorizer.Ready(ctx) != nil || h.peerReady(ctx) != nil {
 			writeError(w, id, problem("unavailable"))
 			return
 		}
@@ -265,10 +278,29 @@ func match(path string) (route, project, action, method string) {
 	return "unknown", "", "", ""
 }
 func (h *Handler) authenticate(r *http.Request) (contract.Principal, error) {
-	for _, header := range []string{"X-Account-ID", "X-User-ID", "X-Remote-User", "X-Forwarded-User", "Remote-User", "X-Authenticated-User"} {
+	for _, header := range []string{"X-Account-ID", "X-User-ID", "X-Remote-User", "X-Forwarded-User", "Remote-User", "X-Authenticated-User", "X-Peer-UID", "X-UID", "X-Forwarded-Uid"} {
 		if len(r.Header.Values(header)) > 0 {
 			return contract.Principal{}, problem("unauthorized")
 		}
+	}
+	peer, captured := r.Context().Value(peerContextKey{}).(peerIdentity)
+	if h.o.PeerAuthenticator != nil {
+		if len(r.Header.Values("Authorization")) != 0 || !captured || !peer.ok {
+			return contract.Principal{}, problem("unauthorized")
+		}
+		if h.peerReady(r.Context()) != nil {
+			return contract.Principal{}, problem("unavailable")
+		}
+		p, e := h.o.PeerAuthenticator.AuthenticatePeer(r.Context(), peer.uid)
+		if e != nil || p.AccountID == "" {
+			return contract.Principal{}, problem("unauthorized")
+		}
+		return p, nil
+	}
+	// A Unix connection must never fall through to Bearer mode after an omitted
+	// peer adapter or a failed credential extraction.
+	if captured {
+		return contract.Principal{}, problem("unauthorized")
 	}
 	values := r.Header.Values("Authorization")
 	if len(values) != 1 {

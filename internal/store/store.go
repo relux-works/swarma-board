@@ -203,6 +203,9 @@ func (d *DB) Update(ctx context.Context, id string, expected contract.Revision, 
 		if s.Revision == contract.Revision(math.MaxUint64) {
 			return failure("unavailable")
 		}
+		if e = appendPosition(tx, s.Revision); e != nil {
+			return e
+		}
 		// JSON decoding detached every nested slice and pointer from the database.
 		existing := map[string]string{}
 		for _, x := range s.Elements {

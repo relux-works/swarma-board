@@ -1,5 +1,5 @@
-// Package auth provides an explicitly synthetic, immutable hash-only authorizer.
-// A changed fixture is adopted only by constructing a new service at restart.
+// Package auth provides synthetic Bearer authorization and an injected protected
+// peer-authority adapter. Synthetic fixture changes are adopted only at restart.
 package auth
 
 import (
