@@ -8,9 +8,11 @@ import (
 )
 
 // ProtectedPeerResolver is supplied by the Host's protected identity/grant
-// authority. Every method must consult current policy (including disabled accounts,
-// UID reuse and revocations). There is no mapping file format or credential custody
-// policy here. ResolvePeer must refuse unknown/disabled/unmapped UIDs; Require and
+// authority. Every method must consult accepted policy (including disabled
+// accounts, UID mappings and grants). First deployment uses StaticPeerResolver:
+// its release snapshot stays fixed and detected drift requires restart. A future
+// protected publisher (A2-036) supplies live revocations. ResolvePeer must refuse
+// unknown/disabled/unmapped UIDs; Require and
 // Projects must recheck current account status and grants, without caching them for
 // the lifetime of a connection. Implementations must support concurrent requests.
 type ProtectedPeerResolver interface {
