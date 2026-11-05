@@ -32,6 +32,9 @@ func RunClient(ctx context.Context, args []string, commit string, out, errOut io
 	if errOut == nil {
 		errOut = os.Stderr
 	}
+	if deploymentSelected(args) {
+		return runDeploymentClient(ctx, args, commit, out, errOut)
+	}
 	o := cli.Options{Commit: commit, Out: out, Err: errOut}
 	var local, ca string
 	rest := make([]string, 0, len(args))

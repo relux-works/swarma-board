@@ -165,3 +165,25 @@ authorship hold; task-specific Source custody, Curator key hold, independent
 Muse review/checks and authorized signed landing remain pending. Existing
 output and output-transport-r2 artifacts are preserved byte-for-byte, with this
 successor's evidence in output-maintenance-r3. No push or live activation occurs.
+
+
+Stage1 integration continues maintenance head
+`3df2eeff13c94bd2f9e78a4512ee98389ae623f8`. The original SSH-signed component
+objects are preserved as merge ancestors: static0600 policy
+`fd8f2ef44c43dd4b54761cd0ff68d5f67d242139`, deployment descriptor/constructors
+`a79afaca71cdefdbf4d6ebaf60430a4e1fec76bf`, and dedicated SSHSIG verifier
+`5f858d3cd688216075cb792ebd889e60d567abe0`. Their owned component files and
+handoff documents remain byte-identical. P5 adapts the proposed app helper and
+owns explicit CLI dispatch, the independent policy-version release pin, static
+resolver/catalog binding, stdout status routing and final-binary acceptance.
+No module/shared-interface/Curator specification or schema changes occur.
+
+The deployment profile is single-trust-unit, UDS-only, with the exact shared
+kernel UID mapped through the frozen release-static policy. A2-035/A2-036 remain
+production blockers, not dependencies of this candidate's integration checks.
+Offline exports remain explicitly unsigned; the external signer/verifier seams
+are available without a real signing adapter, key discovery or custody claim.
+Native v1 is retained; no speculative v2 target is adopted. Packaging/lifecycle
+belong to agents2 board orchestrator. Only temporary synthetic state is used.
+Prior output directories remain immutable; evidence goes to output-stage1-r4.
+Independent Muse review and Source-controlled signed landing remain separate.

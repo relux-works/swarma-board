@@ -17,12 +17,24 @@ import (
 
 // RunServer dispatches offline maintenance before any synthetic service setup.
 // Production startup and protected mapping custody remain gated.
-func RunServer(ctx context.Context, args []string, commit string, out io.Writer) (exit int) {
+func RunServer(ctx context.Context, args []string, commit string, out io.Writer) int {
+	return RunServerWithOutput(ctx, args, commit, out, out)
+}
+
+// RunServerWithOutput routes machine-readable deployment status to stdout.
+func RunServerWithOutput(ctx context.Context, args []string, commit string, status, out io.Writer) (exit int) {
 	if out == nil {
 		out = os.Stderr
 	}
 	if len(args) > 0 && args[0] == "maintenance-export" {
 		return runMaintenanceExport(ctx, args[1:], commit, out)
+	}
+	if len(args) > 0 && args[0] == "maintenance-import" {
+		fmt.Fprintln(out, "unavailable: maintenance import refused; Source authorization and fresh-target validation remain separate")
+		return 2
+	}
+	if deploymentSelected(args) {
+		return runDeploymentServer(ctx, args, commit, status, out)
 	}
 	transport := false
 	for _, a := range args {

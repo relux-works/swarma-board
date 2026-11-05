@@ -1,8 +1,9 @@
 # Synthetic transport composition and production gates
 
 The binaries dock the completed domain/query, server/store/auth, client/CLI and
-transfer packages. All executable startup paths require explicit synthetic
-fixtures. No production adapter or protected mapping policy is installed.
+transfer packages. The legacy qualification startup paths require explicit synthetic fixtures.
+The explicit stage1 profile described below binds the frozen static policy
+adapter; no production policy is installed.
 
 Build with Go 1.25.5, `GOMAXPROCS=2`, `go build -mod=readonly -p 2`, and stamp
 `-ldflags "-X main.commit=EXACT_COMMIT"` for qualification. Unstamped builds say
@@ -80,7 +81,7 @@ explicit persistent journal schema disposition; external signer identity/trust,
 algorithm and custody; authorized sanitized data, source notification disposition
 and cutover/reconciliation authority. Schema-v1 bytes are preserved; version,
 project and digest-bearing persistence remain HELD. `internal/maintenance/**`
-belongs to the independent maintenance producer and is not implemented here.
+belongs to the independent maintenance producer and is consumed unchanged.
 Independent Muse review/checks and authorized signed landing remain required.
 Meta196 removed the Swarma authorship hold; the task-specific Source gate and
 Curator key hold remain in effect.
@@ -145,3 +146,69 @@ source. Existing actual Unix/TLS integration tests continue unchanged. These
 witnesses do not qualify a production source, signature, UID policy or cutover.
 Artifact limits are inherited from dev15 and frozen P2/P4; they do not provide a
 total process-memory bound or a raw-state preallocation bound.
+
+
+### Stage1 explicit single-trust-unit candidate
+
+Both binaries accept `--deployment-profile=single-trust-unit --deployment-status`
+and emit the same safe static JSON descriptor on stdout. Status opens no policy,
+storage or listener and is not live readiness. `production` always refuses with
+both A2-035/A2-036 diagnostics. No admission override exists.
+
+Server startup requires all of the following explicit inputs (absolute paths):
+
+```sh
+swarma-board-server --deployment-profile=single-trust-unit \
+  --unix-socket=/absolute/run/board.sock --data-dir=/absolute/data \
+  --policy-file=/absolute/policy/release.json --policy-version=release-pin \
+  --audit-export-dir=/absolute/exports
+```
+
+The policy-version is a separately reviewed release pin, never inferred from
+policy bytes. The exact schema and custody checks are documented in
+`internal/auth/STATIC_POLICY.md`. Config validation precedes policy loading;
+policy readiness/catalog checks precede registry creation. Data, runtime,
+policy and export trees must be disjoint. The runtime directory must exist and
+be private; the service refuses occupied sockets. No export directory is created
+by startup, and no export operation or signer is selected by that flag.
+
+The existing bounded Unix server uses the same static resolver for kernel UID
+authentication, authorization and readiness. Its actual `/ready` and
+`/v1/version` responses carry `Swarma-Board-Deployment` JSON, including readiness
+503 failures. The shared UID has one account/grant set and no per-agent isolation.
+Policy drift latches closed until an orchestrator-controlled stop and new
+release startup. No policy refresh or client-controlled service recovery exists.
+The catalog includes granted projects only; disabled/no-project startup refuses.
+
+Client operations require `--deployment-profile=single-trust-unit
+--deployment-projection=/absolute/projection.json`, followed by usual product
+arguments. The bounded three-field projection uses the existing public parser;
+its endpoint must be Unix and is resolved once. No credential source is consumed.
+The projected account is a preflight expectation, not peer identity evidence.
+Duplicate/empty/mixed synthetic flags and all dogfood remote activation inputs
+refuse. Separate synthetic TLS qualification remains available and tested.
+
+Maintenance remains a separate offline command with the Host stopped-writer
+assertion and protected paths documented above. The deployment export directory
+is a packaging separation declaration, not an automatic maintenance target.
+The operator must explicitly choose the new checkpoint beneath a protected
+external export parent; no path is inferred from service config. The binary
+publishes only unsigned v1 artifacts. `maintenance-import` unconditionally
+refuses before any storage or service setup. Native product import still uses
+the existing explicit project authorization/transaction path; this task performs
+no real import. The dedicated verifier/external signer seam is in
+`internal/maintenance/sshsig.go`; no Keymaker/keyvault API or real key adapter
+is supplied. Synthetic SSHSIG tests do not establish custody or production trust.
+
+`integration/stage1_binary_acceptance.py` derives from the frozen deployment
+handoff acceptance without modifying that original document. It adds the
+required independent policy-version flag, dispatch negatives, an actual CLI
+mutation, live-writer export refusal, latched policy drift/restoration, clean
+drain, unsigned offline export of the same synthetic service database, exact
+hash/source preservation, occupied-output/import refusal and dead-service
+no-resurrection. Run it against both exact stamped final binaries with a
+synthetic current-UID policy and a NEW evidence directory. Full Go/race/vet,
+legacy Unix/TLS, native-v1 restore and dedicated SSHSIG tests remain required.
+Packaging, installation and lifecycle belong to agents2 board orchestrator.
+Independent Muse review/checks, Source landing and production custody/adoption
+remain separate. A2-035/A2-036 do not block this synthetic integration packet.
