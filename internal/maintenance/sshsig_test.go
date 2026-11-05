@@ -195,7 +195,7 @@ func TestAuditSSHSIGRefusesMalformedAndOversize(t *testing.T) {
 	binary.BigEndian.PutUint32(badLength[10:14], ^uint32(0))
 	badSig := bytes.Clone(blob)
 	badSig[len(badSig)-1] ^= 1
-	cases := [][]byte{nil, {}, []byte("unsigned"), bytes.Repeat([]byte{'x'}, MaxAuditSignature+1),
+	cases := [][]byte{nil, {}, []byte(auditArmorHeader + auditArmorFooter), []byte("unsigned"), bytes.Repeat([]byte{'x'}, MaxAuditSignature+1),
 		append([]byte("prefix"), sig...), append(bytes.Clone(sig), 'x'), append(bytes.Clone(sig), sig...),
 		bytes.ReplaceAll(sig, []byte{'\n'}, []byte("\r\n")),
 		bytes.Replace(sig, []byte{'\n'}, []byte("\n\n"), 1),

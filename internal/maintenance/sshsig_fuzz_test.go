@@ -23,6 +23,7 @@ func FuzzAuditSSHSIGParser(f *testing.F) {
 	signature := auditTestSign(private, manifest, AuditSSHSIGNamespace, "sha512", "", "ssh-ed25519")
 	f.Add(signature)
 	f.Add([]byte{})
+	f.Add([]byte(auditArmorHeader + auditArmorFooter))
 	f.Add(auditTestArmor([]byte{'S', 'S', 'H', 'S', 'I', 'G', 0, 0, 0, 1, 255, 255, 255, 255}))
 	f.Fuzz(func(t *testing.T, candidate []byte) {
 		before := bytes.Clone(candidate)

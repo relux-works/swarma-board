@@ -142,7 +142,8 @@ func (v *AuditSSHSIGVerifier) verifySSHSIG(manifest, armored []byte) error {
 	// Strict single LF-armored block; reject prefixes, headers, trailing blocks,
 	// whitespace and noncanonical base64. One final LF is optional (OpenSSH).
 	armored = bytes.TrimSuffix(armored, []byte{'\n'})
-	if !bytes.HasPrefix(armored, []byte(auditArmorHeader)) || !bytes.HasSuffix(armored, []byte("\n"+auditArmorFooter)) {
+	if len(armored) < len(auditArmorHeader)+len(auditArmorFooter)+1 ||
+		!bytes.HasPrefix(armored, []byte(auditArmorHeader)) || !bytes.HasSuffix(armored, []byte("\n"+auditArmorFooter)) {
 		return ErrSignatureGate
 	}
 	body := armored[len(auditArmorHeader) : len(armored)-len(auditArmorFooter)-1]
