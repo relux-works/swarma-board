@@ -2,7 +2,22 @@
 
 Status: **DRAFT — source contract only; independent review and adoption pending.**
 
-Assigned architect: workbench `425-board-spec-without-migration`, identity
+Latest revision: workbench `498-board4-spec-review-fixes`, isolated worker
+`agents2_swarma_dev7`, acceptance 2026-11-06 23:04:55.635384 UTC, deadline
+23:59:55.635384 UTC (no clock reset). Sirius event
+`$g9e8CZ9Gkq7f16A8A5-QoNzarXxrA0hhbwju5CAdmRM`, 22:55:14 UTC, conveys
+orch-muse's changes-requested old-semantics review by **Claude Opus 5.5**, against
+PR4 head `fd0f0555e615e7f853514ed8c2c5ee8dd6e8c8b9`. The owner binds `urn:sha256:`
+and native payload export/reimport. See [all ten dispositions and review
+limits](review-disposition.md); cases C01–C50 remain proposed, not executed.
+The revision composes `main` at `d2e3d201939aa88c6acdaa09bf0dcee157928b18`
+(merged PR5 notes fix), retaining its code byte-for-byte. PR6's PAX composition
+belongs to unit 492; this work neither edits nor lands it. Historical 399/425
+bindings below are retained as provenance, not claims of current main or renewed
+acceptance. The exact signed head and tree are in the exported receipt, avoiding
+a self-referential commit hash in this document.
+
+Original 425 architect: workbench `425-board-spec-without-migration`, identity
 `agents2_swarma_dev3`, for `TASK-261107-cpd6wt` extending `mo58kt`.
 Requested model/effort: `sol/high`; observed model/effort: **unknown**, because no
 runtime attestation was supplied. This packet contains no provider implementation.
@@ -37,7 +52,7 @@ and [machine-readable cases](conformance.json), then the separate
 claims, and runtime evidence. [Decisions](decisions.json) separates binding owner
 requirements from proposed implementation choices and unresolved gates.
 
-Only these owner requirements are treated as decided here:
+Owner requirements retained from 425, plus the two bound revision decisions above:
 
 1. Board operations always cross a client/server boundary.
 2. Server storage uses a data-provider protocol in its own module.
@@ -48,7 +63,7 @@ Only these owner requirements are treated as decided here:
 6. First-class scoped content-addressed resources with explicit common bounds.
 7. No migration. Existing filesystem behavior remains.
 
-Everything more specific in this directory is a concrete proposal for review.
+Other design choices in this directory are concrete proposals for review.
 In particular d205 did not name a database engine, a module path, an API version,
 or a persistent schema version. Existing Storm/bbolt pins are source facts.
 
@@ -58,7 +73,7 @@ This draft deliberately does not silently rewrite those documents or authorize
 implementation under contradictory contracts. Contract acceptance must name the
 approved deltas, frozen conformance digest, module owner
 and database engine decision before producer release. Root coordinates that gate.
-No worker was launched, no runtime task data was opened, and no board binary was run.
+No adapter worker was launched, no runtime task data was opened, and no board binary was run.
 
 Draft PR publication is authorized; adoption and merge are not. The exact signed
 head/tree and spec/conformance hashes are for fresh independent source-semantics

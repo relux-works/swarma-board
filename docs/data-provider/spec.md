@@ -128,8 +128,11 @@ deletes, quotas, locks or recovery effects. Providers never fetch a URI or execu
 unpack, interpret or sanitize resource bytes.
 
 Existing ordered Element.ResourceRefs remain intact. A URI exactly of the form
-`sha256:<64-lowercase-hex>` references a resource in that Element's own Scope;
-malformed uses of the reserved `sha256:` prefix refuse. Other existing URI
+`urn:sha256:<64-lowercase-hex>` references a resource in that Element's own Scope;
+malformed uses of the reserved `urn:sha256:` namespace refuse. Bare `sha256:`
+is not an accepted URI. This retains the existing `urn` allowlist in both
+`internal/domain/validation.go` and `internal/transfer/validate.go` (`safeURI`),
+and works with the existing `Codec.Encode` reference check. Other existing URI
 forms retain their existing domain semantics and are not fetched by providers.
 Name/Description/Type remain reference metadata, not blob identity. A first-class
 reference must resolve in the resulting state of the same Update, including a
@@ -150,6 +153,40 @@ actual resource membership changes; ChangedIDs retains only changed Element IDs.
 Resources are included even when unreferenced in a coherent Checkpoint, with
 their exact bytes; a Snapshot contains metadata only. Provenance remains a
 separate existing field and is not silently converted into resources.
+
+The shared **domain**, not either provider, owns reference lifecycle. For every
+ordinary element mutation it computes old and resulting same-scope reference
+counts over the complete snapshot, counting each ResourceRef occurrence. When
+an existing referenced digest's count falls from positive to zero, it includes
+that digest in DeleteResources in the **same** ChangeSet. A remaining reference
+on another element (or another name on the same element) keeps the bytes. A
+named-resource replacement puts/verifies the new digest, changes that one named
+ref, and deletes the old digest only if its resulting count is zero. Same bytes
+under the same name need no membership change. There is no persisted refcount
+authority and no async GC; providers independently validate the resulting refs.
+Native-v2 import instead supplies an explicit complete desired membership: a
+payload retained in that archive without refs is an explicit unreferenced put,
+so it is retained even if old references disappear. The domain deletes every
+old member absent from the import and verifies every resulting ref; it must not
+both put and delete a retained digest. This is explicit import membership, not
+implicit GC or a provider-specific exception.
+Already-unreferenced payloads deliberately put through `put_resource` remain
+until explicit `delete_resource`; that operation refuses if any ref remains.
+Successful deletion releases count/raw-byte quota at the same commit, including
+physical reclamation or bounded reclaimable storage accounted by the adapter;
+an unsuccessful/ambiguous transaction cannot report reclaimed logical quota.
+Replacement at the byte cap is evaluated on the **resulting** state, not the
+temporary sum of old and new payloads. Temporary physical space is a separate
+admission check; insufficient disk refuses before decision and retains old state.
+
+The common domain resource policy keeps the old FS **text-only** rule: a
+first-class payload containing any NUL byte refuses `resource_binary_refused`
+before Update, including import and direct domain puts. It does not add an
+unrequested UTF-8 restriction on payload bytes. The provider remains opaque and
+binary-capable (provider conformance includes NUL); reference metadata still uses
+existing UTF-8/text validation. Remote managers that previously bypassed the FS
+validator were binary-capable; this deliberate common-domain restriction is a
+compatibility delta, not a claim of parity with all old managers.
 
 ## P3. Operations and outcomes
 
@@ -183,9 +220,78 @@ type Provisioner interface {
 No board deletion, backend switching, import parsing, raw SQL, partial writes,
 arbitrary files, capability minting, or transaction nesting API is in this
 protocol. Bounded resource puts use Update, not an out-of-band blob write.
-Existing transfer/domain behavior is preserved; this protocol adds no archive
-format, historical-data conversion, restore procedure or automatic copying.
+Existing native-v1/legacy-v2 decoding remains as implemented for their supported
+inputs. The bounded **native-v2 payload export** below is the one explicit
+transfer addition required by the owner; no historical-data conversion, replay
+restore procedure or automatic copying is introduced.
 Checkpoint is a coherent protocol value, not an execution or adoption instruction.
+
+### Native-v2 own-export/reimport contract
+
+The shared integrator extends transfer, not either adapter. Export obtains one
+Checkpoint, then emits deterministic single-member gzip/ordinary USTAR with no
+links, special entries, PAX/GNU extensions, extraction or URI fetch. Manifest path
+is `.swarma-board-transfer.json`; required compact-JSON fields in order are
+`format:"swarma-board", version:2, source_commit, scope, revision, files,
+resources`. Scope/Revision use P6 encoding. `files` is a bytewise path-sorted
+array of `{path,sha256,size}` covering every non-manifest file exactly once.
+`resources` is a digest-sorted array of ResourceInfo, including **unreferenced**
+members. Required `elements.json` is `{schema_version:2,board:{...},elements:[...]}`
+with Board encoded as in P6 and the existing Element field/tag order; existing
+provenance files retain their
+exact paths/bytes. A payload lives only at `resources/<64-lowercase-hex>` as raw
+bytes, once per digest; no base64 in tar. Its filename, files checksum, declared
+size and ResourceInfo must all agree. No other entries or directory headers are
+emitted/accepted. SourceCommit is nonempty NUL/control-free UTF-8 of at most 128
+bytes; fixed exporter build metadata, never supplied by an export caller.
+Empty resources have a zero-length entry. The manifest's source
+commit/scope/revision are inert provenance, never Actor, grant or target CAS.
+
+Native-v2 common limits: 20,002 total regular entries (manifest + elements + at
+most 10,000 provenance + 10,000 resources), 8 MiB manifest, 128 MiB elements
+entry, 8 MiB individual provenance, 32 MiB resource, 512 MiB expanded tar
+**including headers, padding and terminator**, 640 MiB compressed gzip including
+framing. Charge compressed, expanded, entry/count/JSON and provider bounds before
+allocation; no truncation. These are new version-specific limits; old versions'
+64/256/8 MiB compressed/expanded/entry limits and the 8 MiB query body stay.
+The 640 MiB compressed budget allows overhead for a 512 MiB incompressible tar;
+it is an upper refusal bound, not an expected output size or memory claim.
+The snapshot cap covers elements plus provenance metadata/base64: their native
+entries together are at most 128 MiB plus fixed JSON framing; adding 256 MiB raw
+resources, at most 20,002 tar headers/padding and an 8 MiB manifest remains below
+512 MiB. Thus all modeled at-cap states have export headroom; encoder validation
+must still check exact bytes. Implementations must bound working memory/temporary
+space and stream or spool privately; no assumption that buffers fit in RAM.
+
+Import strictly validates the full archive before one scoped CAS Update: duplicate
+JSON keys/paths, unknown fields/version, unsafe paths, extra/missing/checksum/size
+mismatches, reserved malformed URIs, missing payloads and NUL domain payloads all
+refuse with zero effects. Target Scope must equal manifest Scope; cross-scope
+remapping is not offered. Replacement uses the target's current revision and
+server Actor; imported revision/events do not replace local history. It replaces
+facts, provenance and complete resource membership atomically, including removal
+of old unreferenced members absent from the export. Exported Board metadata must
+equal the admitted target's existing Board (otherwise scope_conflict without
+mutation); Update cannot rename/provision a Board. This preserves Board metadata
+on own-export/reimport without adding board CRUD. Unlike native-v1 Prepare,
+native-v2 does **not** append archive manifests/import receipts to persisted
+provenance; its inert source report is returned separately. This avoids making an
+at-cap board's own export too large to reimport. Reimporting an unchanged export
+preserves all facts, refs and payload bytes and creates one normal import event.
+This is lossless current-state round trip, not authenticated-history restoration.
+It remains subject to CAS, available disk, admission/time bounds and event-tail
+space; a sealed event-full scope cannot accept any import. The source archive
+remains valid and readable in that case. Native-v1 export must refuse a scope
+with first-class resources rather than silently omit bytes; native-v2 is the
+default for such scopes, with explicit version negotiation and safe refusal by
+old clients. Wire/API integration and compatibility review remain required before
+this format is enabled. The maintenance snapshot must choose this payload form
+or Checkpoint explicitly; it may not silently call resource-lossy v1 Encode.
+The own-round-trip promise is for **domain-valid** state. A provider-only binary
+fixture with NUL is legal at that lower layer but is not a valid domain board:
+native-v2 domain export refuses it before output with resource_binary_refused,
+rather than producing an archive the domain cannot reimport. Checkpoint continues
+to preserve its exact bytes for lower-layer diagnosis without claiming restore.
 
 Callbacks are trusted server domain functions: bounded, deterministic from their
 inputs and injected clock/ID generator, no external I/O, no credentials, no
@@ -222,6 +328,7 @@ failure, with the outcome rule below. Success data is zero/absent on error.
 | `revision_conflict` | Expected Counter differs; HTTP 412, current revision disclosed only after authorization. |
 | `invalid_snapshot` | Record-count/schema/record-shape or provenance validation refuses; HTTP 422. |
 | `payload_too_large` | Defined byte bound exceeded, never truncate; HTTP 413. |
+| `resource_binary_refused` | Shared domain rejects NUL in a first-class resource; HTTP 422; provider bytes remain opaque. |
 | `unsupported_schema` | Unknown/newer persistent format; HTTP 503. Never initialize or downgrade it. |
 | `unavailable` | Closed/busy/recovery/required capability/backend unavailable or revision overflow; HTTP 503. |
 | `storage_error` | Detected malformed committed facts/history or pre-commit storage failure; HTTP 500. |
@@ -245,6 +352,13 @@ resource digests. Event here
 records v1-style facts, not a digest-bearing D6 journal or authenticated history.
 Old events are immutable through the product API. A storage administrator can
 rewrite storage; a provider is not an independent attestation system.
+
+Per-element `activity` history is **deliberately dropped** from this protocol.
+Events identify an Actor and changed IDs, but contain neither field deltas nor
+old values; filtering them cannot reconstruct what changed on an element.
+Imported activity remains inert provenance. No compatibility claim is made for
+the old element activity query; a future history feature requires its own scope,
+retention, API and review. No history is fabricated from import or checkpoint.
 
 Updates are serializable within one Scope, including writers using separate
 handles/processes in any supported deployment topology. Concurrent updates with
@@ -312,28 +426,83 @@ revision/event; a mutex alone, pair-only generation counter, sequential
 WriteReadme/WriteProgress calls or a non-authorizing write journal is insufficient.
 FS logical reads use that envelope/lock or return unavailable until recovery.
 Existing filesystem behavior and source bytes remain unchanged by this spec.
-The future adapter must preserve existing markdown, paths, field/array behavior
-and recovery guarantees; no existing board is opened or rewritten here. Strict
+The new strict FS provider opens **only trees created by its EnsureEmpty** with
+recognized provider schema, full Scope metadata and complete coherent envelope.
+Legacy trees remain with old task-board; missing schema, unknown sections that
+cannot be represented losslessly, and missing README pairs refuse, not repair.
+For new trees the adapter must preserve its supported markdown, paths,
+field/array behavior and recovery guarantees; unknown source text must never be
+silently dropped. No existing board is opened or rewritten here. Strict
 server reads must not silently omit unreadable facts. Execution/CR-derived
 authority hooks are outside this provider protocol; existing upstream behavior
 is not changed by that boundary. If faithful adaptation exposes an incompatibility,
 report its exact source seam for protocol review; do not introduce a conversion
-project, sanitizer or migration prerequisite.
+project, sanitizer or migration prerequisite. The target for later owner scripts
+is a provider-created compatible tree with recognized schema, scoped metadata,
+complete representable facts, integrity and recovery envelope; this is an
+openability target only, not a migration design, loader or permission.
 
-Default proposed limits, for parity: 10,000 Elements per Scope; 64 MiB compact
-UTF-8 serialized Snapshot (protocol key/record order, described below); 64 MiB
-complete serialized event NDJSON including LF; 8 MiB per provenance payload;
-10,000 resources and 64 MiB total raw resource bytes per Scope, 8 MiB per
-resource, 64 MiB complete canonical ChangeSet and 256 MiB complete canonical
-Checkpoint (including base64 payload expansion and event arrays). Existing
-network query/archive limits remain unchanged, including the 8 MiB query body;
-future resource wire routes must enforce their own explicit common cap and the
-provider caps before allocation. No route is implemented or enabled here. Charge sizes before
-unbounded decoding/accumulation and refuse, never truncate. This strengthens the
-old store's raw allocation limits and requires validation in both adapters.
-Limit changes belong to the common contract, not server tuning that changes
-which implementation accepts a request. Resource/time bounds still need measured
-qualification; these byte caps are not a total process-memory guarantee.
+Renaming/reparenting a container changes physical paths for its entire descendant
+subtree even when descendant Element values/ChangedIDs are unchanged. One commit
+envelope must cover every affected path plus facts, resource membership, revision
+and event. The shared fault suite covers this explicitly; a DB's simpler key
+update must not weaken the FS oracle or add descendants to ChangedIDs merely
+because their paths moved.
+
+### Common capacity decisions and recovery
+
+All units below are binary MiB (1,048,576 bytes). Proposed common limits replace
+the draft's 8 MiB resource / 64 MiB scope numbers; they are **not old parity**.
+The review reports 2026-11-06 clone totals of 28 MB architecture, 20 MB session
+host (one file >8 MiB), and 17 MB codex-fix after untracking run logs; old server
+upload was 25 MiB, old FS had no per-file cap. These are reviewer-supplied mixed
+tree totals, not this worker's measurements, raw-resource totals or growth rates.
+32 MiB/resource exceeds the old 25 MiB upload by 28%; 256 MiB raw resources is
+over nine times 28 decimal MB (and over nine times 28 MiB). It gives explicit
+headroom without claiming the unidentified >8 MiB file fits 32 MiB or that any
+existing board is admissible. No existing data is opened to establish that.
+
+| Cap | Common value | Refusal and recovery |
+| --- | --- | --- |
+| Elements | 10,000 | One-over invalid_snapshot; delete existing elements and retry under fresh CAS. |
+| Canonical Snapshot | 128 MiB | One-over payload_too_large; reduce/remove facts/provenance/refs in a resulting-state Update. Metadata-only View/Checkpoint remain available at cap. |
+| Provenance | 10,000 files; 8 MiB/file | Count invalid_snapshot / bytes payload_too_large; domain may replace/clear provenance to reclaim; no silent dropping. |
+| Resource membership | 10,000; 32 MiB/file; 256 MiB raw total/scope | Count invalid_snapshot / bytes payload_too_large; explicit delete of unreferenced payloads or atomic domain dereference/delete/replacement frees logical quota. |
+| Canonical ChangeSet | 512 MiB | Oversized command refuses before decision; send smaller independent commands under fresh CAS where semantics permit; never split a command that requires atomicity. Deletions carry IDs, not removed bytes. |
+| Canonical event NDJSON including LF | 256 MiB | Admission tests resulting stream including the next complete event. If it cannot fit, reject Update before decision with payload_too_large; callback may have run once to determine changed IDs. Seal scope read-only only when no next event can fit. See terminal recovery below. |
+| Canonical Checkpoint | 1,024 MiB | Whole-result payload_too_large on overflow; this is a redundant encoder guard, not a lower writable-state cap. 128 MiB Snapshot + base64 of 256 MiB resources (~342 MiB) + 256 MiB events + bounded framing is <1,024 MiB. A valid modeled state must remain checkpointable at all other caps. |
+| Native-v2 transfer | P3's explicit entry/count/512 MiB expanded/640 MiB compressed caps | Bad/oversized input refuses before Update; old state remains. Valid modeled exports fit with headroom; writer/space failures remain actual failures. Current-state cleanup or a smaller separately scoped command may reduce an oversized request; no truncated archive. |
+
+All resulting-state bounds are checked **together** before durable decision,
+including the event that records quota cleanup. Reserve the actual encoded next
+event length, not an assumed constant: AccountID/RequestID/ChangedIDs are bounded
+but variable. At 90% of event capacity (241,591,910 bytes, floor), signal a safe
+capacity warning to the admitted operator and preserve export headroom. The
+shared server derives the warning from encoded stream size; it grants no extra
+provider API or authority. At an event refusal, a smaller command may fit if its
+actual complete event fits; no
+bytes from the refused command persist. When not even a minimal valid next event
+fits, recovery is **read-only retirement**, not resumed writes:
+View/ReadResource/Checkpoint/native-v2 export continue, old events are immutable,
+and no compaction/reset/delete/hidden rollover API exists in v1. The server
+control plane may provision a different explicitly named empty scope, which
+starts at revision 0 with no automatic copying, import, routing alias or history
+continuation. Continuing the sealed scope would require a separately reviewed
+contract change; operators must not be told that deleting blobs clears history.
+The same terminal rule applies to revision overflow. Scope retirement is a
+deliberate bounded limitation; an implementation must disclose it before use.
+
+Per-resource/per-provenance caps constrain admission, not existing valid bytes;
+at-cap reads still work. Snapshot/blob/count cleanup is possible only while the
+next event fits, so warnings precede sealing. On disk exhaustion, pause writes,
+retain old state/recovery evidence, and let the storage custodian provide space
+outside the protocol before bounded retry/recovery. Logical quota release is
+not a claim about immediate engine file shrinkage; adapters must report physical
+space/reclaim requirements and cannot promise reuse they do not implement.
+No automatic board deletion, storage editing, migration or copying is prescribed.
+Limits are identical for both providers and cannot be server tuning. Charge
+sizes before unbounded decoding/accumulation; refuse, never truncate. Byte/time
+caps need qualification and do not bound total process RAM or disk amplification.
 
 For the size/parity oracle, protocol v1 JSON uses compact Go encoding/json,
 UTF-8, default HTML escaping, no trailing newline; structs in declaration order
@@ -354,16 +523,28 @@ Top-level empty arrays are explicit `[]`, except ChangeSet.provenance nil is
 Element nested null/empty distinctions stay as stored. Protocol runner
 owns canonical vectors; adapters may use different internal encodings.
 
-Common proposed operation bounds: default 5-second provider deadline if absent,
-and cap longer caller deadlines at 5 seconds; lock acquisition at most 2 seconds
-within that budget. Cancellation before the commit decision leaves old state;
+Common proposed operation bounds: View/ReadResource default and maximum 30 s;
+Update/Checkpoint default and maximum **300 s**, including a 10,000-element
+import/FS subtree move; lock acquisition at most 2 s within the operation budget.
+Effective budget is min(caller deadline if any, operation cap), not 5 seconds.
+300 s is a finite proposal, **unmeasured**, not a promise that 10,000 durable
+file updates finish in it. Both providers must qualify maximum-count, large-byte
+and deep-subtree cases and report wall time, sync count, storage/config and peak
+temporary space. If an allowed FS case cannot complete within 300 s, parity is
+NOT VERIFIED and producer release/freeze must revisit this common budget or
+algorithm; it may not claim pass, use a provider-specific cap or silently reduce
+the shared limits. Cancellation before the commit decision leaves old state;
 after it, the outcome rules above apply. The trusted callback must cooperate
 with its bounded execution budget; these are not a claim that Go can forcibly
 interrupt arbitrary code. Close stops admission immediately and drains to a
-documented shutdown deadline (proposed 30 seconds); on expiry return unavailable
+documented shutdown deadline (proposed 330 seconds); on expiry return unavailable
 while retaining handles needed by unfinished operations, not a false successful
-close. Recovery/startup have a separately reported finite budget (proposed 30
-seconds); failure retains evidence and readiness stays unavailable. Qualify
+close. Recovery/startup have a separate finite proposed 600 s budget; expiry
+retains all evidence, keeps readiness unavailable and requires a custodian-led
+bounded recovery attempt after correcting capacity/faults. Do not clear journals
+to meet a clock. Any 300 s expiry after decision follows the complete-new or
+unknown-outcome barrier rules above; returning a timeout never permits torn reads
+or unsafe journal cleanup. A short caller deadline has the same rules. Qualify
 actual elapsed times for both providers. No unbounded wait, retry loop or
 total-memory guarantee follows from these caps.
 
@@ -427,14 +608,23 @@ Scope JSON bytes defined in P6, followed by canonical unsigned decimal Counter
 (no leading zeros except 0). Reject weak tags, `*`, multiple values, malformed
 values and a digest unequal to the route's exact Scope as `invalid_request`.
 This binds the full Scope and Counter; a tag from another scope refuses.
-Existing v1 behavior is unchanged by this documentation revision. Product-aware
+The v1 route `/v1/boards/{project}` after provider swap binds to exactly **one
+explicit server-configured `v1_product_id`**, validated with P2's ID grammar at
+startup. V1 project maps to BoardID within that product, and admission authorizes
+the full pair. This is a fixed compatibility route binding, never a guessed or
+fallback product: no configured binding means v1 routes are disabled (404) before
+provider access. V2 always requires its explicit product even when v1 is bound.
+V1 preconditions remain v1-shaped only on that route; the server internally binds
+their revision to its fixed Scope, and copied/mixed v2 tags refuse. V1 native
+transfer remains v1 and safely refuses first-class resources; clients need v2
+payload negotiation to export those scopes. Product-aware
 projection/client/API details, including bounded remote resource operations, are
 future shared integration work after protocol review, not a second client-side
 storage implementation. A future server must obtain explicit full scope from
 reviewed server configuration/routing; it cannot guess a product or accept a
 caller filesystem path. No current DB/schema/archive or filesystem board is
-converted, copied or reinterpreted. No new native transfer format or legacy-data
-mapping is proposed here. Unknown persistent formats still refuse as required by
+converted, copied or reinterpreted. Only P3's native-v2 payload form is added;
+there is no legacy-data mapping. Unknown persistent formats still refuse as required by
 the existing storage contract; this refusal is not a migration work dependency.
 
 The existing source uses Storm v3.2.1 over bbolt v1.3.4. This is the smallest DB

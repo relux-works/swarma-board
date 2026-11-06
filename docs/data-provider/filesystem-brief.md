@@ -23,6 +23,9 @@ against unreviewed choices or to change an old contract unilaterally.
 This is a next separate workbench after protocol review, not implementation work
 inside 425. The superseding owner decision is no migration. Existing filesystem
 behavior remains; there is no sanitizer, pilot or data-conversion dependency.
+498 composes merged PR5 `d2e3d201939aa88c6acdaa09bf0dcee157928b18`; the old
+pins above remain source-semantics references. Read review-disposition.md and
+the revised common limits/native-v2 contract before implementation admission.
 
 ## Preserve the existing design
 
@@ -64,6 +67,11 @@ can report tolerant-walk faults and derives CR/checkpoint lifecycle. The new
 provider must reject incomplete reads and omit execution-authority derivation;
 it must preserve representable task facts. Do not invoke the legacy loader as a
 black box and assume its complete semantics belong in the new product.
+It opens only new trees created by the provider with recognized schema, complete
+Scope metadata and recovery envelope. Legacy trees stay on old task-board;
+unknown sections and progress-without-README refuse unchanged. Markdown fidelity
+applies to supported new trees, never a promise to open arbitrary legacy trees.
+P6's openability sentence is a later-script target, not conversion instructions.
 
 The legacy implementation is under another module's `internal` package and
 imports CLI/internal execution and remoteconfig packages (`fs_store.go:13–20`).
@@ -102,6 +110,12 @@ do not duplicate implementation-shaped tests merely to increase test counts.
 Explicitly show that identical task/board IDs in alpha and beta never alias
 paths, locks, cache, revision, events or checkpoints. No external legacy writer
 may share the adopted live server tree.
+Also run C42–C50 at their assigned layers. In particular map C45 container rename
+and reparent through all real C13–C16 phases for descendants outside ChangedIDs.
+Domain owns C43 last-ref deletion/name replacement; adapter enforces resulting
+ref integrity and quota reclamation atomically. C44 keeps provider bytes opaque
+while domain rejects NUL. No 5 s large-update claim is permitted: C50 must measure
+the proposed common 300 s operations and 600 s recovery, or hold qualification.
 
 Deliver exact base/head/tree/diff, command clocks/exits, source attribution,
 common runner digest, per-case results, failure evidence, supported topology,

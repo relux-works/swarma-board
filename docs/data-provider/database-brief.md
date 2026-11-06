@@ -47,6 +47,9 @@ adapter brief is for synthetic, explicitly scoped new state against the reviewed
 protocol. It neither opens existing data in a new mode nor defines a conversion,
 archive mapping or transfer format. Unknown formats still refuse without
 initialization. No earlier migration request remains a work dependency.
+Exception to the historical no-transfer-addition wording: the shared integrator
+now owns P3's explicit bounded native-v2 payload export/reimport, binding Sirius's
+498 revision decision. It is not an adapter-specific format or legacy mapping.
 
 Implement first-class scoped content-addressed resources in the same durable
 transaction: ResourceInfo/Resource, ReadResource, PutResources, DeleteResources,
@@ -80,6 +83,12 @@ an unrelated successful write. C33–C41 cover resources/bounds/deadlines.
 C32 native durability stays a separate evidence
 claim. Existing tests are starting witnesses, not proof of the new product-scope
 or module contract. No result from the old suite automatically passes a new case.
+Consume revised cases C42–C50 at their specified layers as well. Domain owns
+last-reference cleanup/NUL refusal; DB remains opaque, validates resulting refs,
+and reclaims logical quota in the same transaction. Run the same container
+rename/reparent oracle as FS, without broadening ChangedIDs for physical moves.
+Common limits and proposed 300 s Update/Checkpoint / 600 s recovery apply equally;
+neither DB speed nor an old suite qualifies the new large-workload contract.
 
 Deliver exact base/head/tree/diff, common runner digest, engine/config/pin
 evidence, each case's result, preserved failures, command clocks/exits and a

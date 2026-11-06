@@ -1,5 +1,14 @@
 # Preserved 399 source observations — 2026-11-06 UTC
 
+**498 revision boundary:** historical 399/425 observations below are not fresh
+main/PR/runtime claims. Current composition is main
+`d2e3d201939aa88c6acdaa09bf0dcee157928b18` (merged PR5) plus PR4 documentation;
+see review-disposition.md for exact prior PR4 head and all ten findings. PR6/492
+remains separately owned. No product source/module/dependency changes relative
+to composed main, full Go suite, board binary, server or private-board run are
+part of 498. Any narrow URI witness is bound only to the exact source/commands in
+the exported receipt, and constitutes zero runtime qualification.
+
 The observations below were recorded in sealed 399, before 425's draft PR.
 They are historical evidence, not fresh GitHub/runtime observations in 425.
 425 descends from its exact signed head/tree as bound in README and preserves

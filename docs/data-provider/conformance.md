@@ -7,8 +7,11 @@ DB producer is released. A producer may not change vectors, omit inconvenient
 cases or weaken assertions. The contract owner implements one runner consumed
 unchanged by both factories. No test runner/product code is added in this unit.
 
-425 revises the contract to 41 proposed cases. C33–C40 cover first-class scoped
-resources and C41 common operation bounds. The no-migration owner decision
+498 revises the contract to 50 proposed cases. C33–C40 cover first-class scoped
+resources and C41 common operation bounds. C42–C50 cover payload round trip,
+domain lifecycle/NUL policy, subtree moves, capacity recovery, v1 binding,
+deliberate history omission, strict new trees and measured-workload gates.
+The no-migration owner decision
 supersedes conversion proposals in 399. No conformance case has been executed;
 both adapters and the shared runner are next separate workbenches after review.
 
@@ -44,17 +47,17 @@ from synthetic process-death testing.
 
 The JSON fixture defines three independent scopes. Each is provisioned at
 counter 0. Seed the same three Elements in one Update expected 0, yielding
-counter 1, one event, changed IDs `[EPIC-a,STORY-a,TASK-a]`. Seeding is a trusted
+counter 1, one event, changed IDs `[EPIC-1,STORY-1,TASK-1]`. Seeding is a trusted
 test-domain callback, never a network provisioning route. Board names are
 `A work`, `B work`, `A other`; descriptions empty. Element records use the exact
 native-v1 fields/types from the bound source; any omitted string is empty, any
 omitted nonnullable slice explicit empty; nullable timestamps/estimate are null.
 These fixture omissions are an authoring shorthand, not a wire/storage default.
 The fixture records are generated once by the contract runner, identically for
-both backends. TASK-a starts with explicit `notEstimated`.
+both backends. TASK-1 starts with explicit `notEstimated`.
 
 Resource cases add raw empty bytes and ASCII `abc`, with their exact SHA256
-vectors in C33; reference URIs use `sha256:<digest>`. Initial ordinary fixture
+vectors in C33; reference URIs use `urn:sha256:<digest>`. Initial ordinary fixture
 Resources/ChangedResourceIDs are empty arrays. Resource-specific cases seed
 payloads explicitly and compare byte-for-byte, including unreferenced resources.
 Canonical Checkpoint equality includes Snapshot.Resources, payloads, and changed
@@ -71,9 +74,9 @@ complete Checkpoint after the requested update. Equality compares exact modeled
 values plus canonical bytes from P6. Imported provenance and empty/null cases
 are checked without deriving identity or authority.
 
-Unless a case explicitly says otherwise, update TASK-a.Notes to `changed` at
+Unless a case explicitly says otherwise, update TASK-1.Notes to `changed` at
 expected revision 1. Expected success: counter 2; same three records with only
-that field changed; exactly two events; last changed IDs `[TASK-a]`; Actor matches
+that field changed; exactly two events; last changed IDs `[TASK-1]`; Actor matches
 the injected value; unrelated scopes remain byte-identical. A read with a retained
 returned slice is not a live reference to provider state.
 
@@ -93,6 +96,21 @@ must recover `new`. For genuinely ambiguous publication/fsync failures, report
 recovery, then expose exactly `old` or `new` as justified by the durable decision.
 At no time may a successful View/Checkpoint expose a torn mixture. Tests assert
 actual complete states, not merely error presence or file existence.
+
+C45 repeats every C13–C16 phase for container rename/reparent, including all
+descendant path changes that leave logical descendant records out of ChangedIDs.
+C43 does the same for reference deletion/replacement and logical quota reclaim.
+The shared domain composes these changes; neither factory defines a weaker suite.
+For event-cap tests distinguish a rejected large event from a terminal stream
+with no minimal valid next event space; smaller commands may still fit in the
+former, while the latter stays read-only permanently under this protocol.
+
+The 300 s Update/Checkpoint and 600 s recovery values are proposed test bounds,
+not measurements. C50 must report actual workload, clocks, exits, durable sync
+and temporary-space costs; failure to complete a valid allowed workload keeps
+qualification held pending a reviewed common design/budget change. C42's native
+format/own-reimport oracle is a future integration contract; reading this file or
+running a URI Encode witness does not pass it, the adapters, or any runtime gate.
 
 All provider cases are required for provider parity acceptance. Server cases are
 required for integrated acceptance. The physical durability case is required for
