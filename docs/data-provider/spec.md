@@ -2,8 +2,9 @@
 
 This is a reviewable proposal under the authority and exact source bindings in
 [README](README.md). MUST below defines the proposed common contract; it does not
-claim owner ratification. No implementation, deployment or migration is authorized
-by this draft alone. Existing product behavior outside the listed deltas stays in
+claim owner ratification. The superseding owner decision is **no migration**;
+earlier migration requests are withdrawn, with no migration gate for this protocol.
+No implementation or deployment is authorized by this draft alone. Existing product behavior outside the listed deltas stays in
 the root contract and its D6 successor sections.
 
 ## P1. Boundaries and module ownership
@@ -62,29 +63,36 @@ type Snapshot struct {
     Revision Revision
     Elements []Element
     Provenance []ProvenanceFile
+    Resources []ResourceInfo
 }
 type ChangeSet struct {
     Upserts []Element
     Deletes []string
     Provenance []ProvenanceFile
+    PutResources []Resource
+    DeleteResources []string
 }
+type ResourceInfo struct { SHA256 string; Size int64 }
+type Resource struct { Info ResourceInfo; Data []byte }
 type Actor struct { AccountID, RequestID, Operation string; At time.Time }
-type Commit struct { Revision Revision; ChangedIDs []string }
+type Commit struct { Revision Revision; ChangedIDs, ChangedResourceIDs []string }
 type Event struct {
     FormatVersion uint32
     Scope Scope
     Revision Revision
     Actor Actor
     ChangedIDs []string
+    ChangedResourceIDs []string
 }
-type Checkpoint struct { Snapshot Snapshot; Events []Event }
+type Checkpoint struct { Snapshot Snapshot; Events []Event; Resources []Resource }
 ```
 
 `ProductID` and `BoardID` each use the existing ASCII project-ID grammar
 `[a-z0-9][a-z0-9_-]{0,63}`; empty, uppercase, traversal, encoded separators,
 backslashes, NUL and Unicode lookalikes refuse before storage lookup. This is
 identifier validation, not path cleaning or an authorization decision. BoardID is
-the existing project ID within one product. Scope is always the pair; neither a
+the existing project ID within one product (project scope, not an extra tenancy
+level). Scope is always the pair; neither a
 board ID nor a globally unique-looking task ID may substitute for it. Element
 references (parent, blockers, manual edges and resource references to elements)
 resolve only in that same board. Cross-board/product links refuse; no implicit
@@ -108,6 +116,41 @@ ListBoards operation. Control-plane provisioning is an explicit server operation
 after admission. Product identity, catalog ownership, and grant authority are
 configured server inputs; no new principal registry is invented here.
 
+### First-class content-addressed resources
+
+A resource is provider-owned opaque bytes, keyed by the full Scope plus the
+lowercase 64-hex SHA256 of those exact bytes. Empty bytes are legal and have the
+standard empty SHA256. Size must equal len(Data); digest/size mismatch refuses
+`invalid_snapshot`, malformed digest refuses `invalid_request`. Resource bytes
+are immutable. Identical bytes may exist independently in multiple scopes;
+physical deduplication cannot expose existence or permit cross-scope reads,
+deletes, quotas, locks or recovery effects. Providers never fetch a URI or execute,
+unpack, interpret or sanitize resource bytes.
+
+Existing ordered Element.ResourceRefs remain intact. A URI exactly of the form
+`sha256:<64-lowercase-hex>` references a resource in that Element's own Scope;
+malformed uses of the reserved `sha256:` prefix refuse. Other existing URI
+forms retain their existing domain semantics and are not fetched by providers.
+Name/Description/Type remain reference metadata, not blob identity. A first-class
+reference must resolve in the resulting state of the same Update, including a
+newly put resource; missing/foreign resource refuses `invalid_snapshot` with no
+cross-scope lookup. Dangling content-addressed references cannot be committed.
+
+PutResources and DeleteResources participate in the same revision-CAS transaction
+as records. A nonidentical put at an existing digest refuses invalid_snapshot;
+no bytes are overwritten, even for a hypothetical digest collision. An identical existing put is idempotent within an accepted Update;
+that Update still advances revision once. Duplicate puts, duplicate deletes or
+intersection of those lists refuse `invalid_request`. Delete of an absent
+resource is `not_found`; deleting a resource still referenced in the resulting
+state refuses `invalid_snapshot`. Unreferenced resources may be stored within
+the same bounds. There is no implicit garbage collection, mutable blob update,
+unscoped lookup, resource filesystem path, separate staging service or separate
+resource revision. ChangedResourceIDs is the sorted distinct digest list of
+actual resource membership changes; ChangedIDs retains only changed Element IDs.
+Resources are included even when unreferenced in a coherent Checkpoint, with
+their exact bytes; a Snapshot contains metadata only. Provenance remains a
+separate existing field and is not silently converted into resources.
+
 ## P3. Operations and outcomes
 
 Proposed standard-library protocol:
@@ -115,6 +158,7 @@ Proposed standard-library protocol:
 ```go
 type Provider interface {
     View(context.Context, Scope) (Snapshot, error)
+    ReadResource(context.Context, Scope, string) (Resource, error)
     Update(context.Context, Scope, Revision, Actor,
         func(Snapshot) (ChangeSet, error)) (Commit, error)
     Checkpoint(context.Context, Scope) (Checkpoint, error)
@@ -129,19 +173,19 @@ type Provisioner interface {
 | Operation | Exact semantics |
 | --- | --- |
 | `View` | One coherent committed state at one scoped revision; complete detached records, bounded before returning. No initialization, recovery writes, partial/tolerant tree read or dropped parse failure. Unknown scope: `not_found`. |
+| `ReadResource` | Digest lookup in one admitted Scope; detached complete verified bytes, or `not_found` for absent scope/resource. No fetch/path fallback. Verify stored digest/size before success; corruption is `storage_error`. Reads never advance revision. Immutable bytes remain valid if membership is later deleted; this call is not a multi-call snapshot lease. |
 | `Update` | Validate scope, nonnil callback and complete server Actor. Under the writer transaction/lock, compare full scoped expected revision, run callback at most once on detached state, validate changes, atomically publish facts/provenance/revision/event, return sorted changed IDs. No unconditional write variant. |
-| `Checkpoint` | One coherent Snapshot plus contiguous events 1..Counter from the same logical read transaction. No separate View+audit combination; no signing or replay claim. Bounds overflow refuses the whole result. |
+| `Checkpoint` | One coherent Snapshot, contiguous events 1..Counter, and all resource payloads matching Snapshot.Resources from the same logical read transaction. No separate View+audit+resource loop; no signing or replay claim. Verify all resource bytes. Bounds overflow refuses the whole result. |
 | `Ready` | All configured handles/schema/recovery/capabilities usable; no secrets or board metadata in public output. A startup/latched recovery failure is unavailable. It does not authenticate anyone or establish production admission. |
-| `Close` | Stop new operations, drain admitted in-flight operations, close handles exactly once, return the stable close error on repeated calls. Later operations refuse `unavailable`. Server stops admission and drains HTTP before invoking it. |
+| `Close` | Stop new operations, drain admitted in-flight operations within the shutdown bound below, close handles exactly once after drain. A timed-out call returns unavailable without invalidating in-flight handles; later Close calls may finish draining. Once fully closed return the stable final close error on repeats. Later data operations refuse unavailable. Server stops HTTP admission before invoking it. |
 | `EnsureEmpty` | Explicit control-plane provisioning, never network board CRUD. Create only absent empty scope at revision 0 with no events. Existing identical metadata: no-op even with existing facts; mismatched metadata: `scope_conflict`, never overwrite. Failure must not report a usable partially provisioned scope. |
 
 No board deletion, backend switching, import parsing, raw SQL, partial writes,
-resource payload upload, arbitrary files, capability minting, or transaction
-nesting API is in this protocol. Native/archive import is validated by shared
-Transfer/domain then uses one `Update`; emptiness and expected revision are
-checked inside that transaction. Backup formats can remain provider-specific
-offline operator tools. Portable comparison/export uses the common Checkpoint;
-neither authorizes restore or cutover.
+arbitrary files, capability minting, or transaction nesting API is in this
+protocol. Bounded resource puts use Update, not an out-of-band blob write.
+Existing transfer/domain behavior is preserved; this protocol adds no archive
+format, historical-data conversion, restore procedure or automatic copying.
+Checkpoint is a coherent protocol value, not an execution or adoption instruction.
 
 Callbacks are trusted server domain functions: bounded, deterministic from their
 inputs and injected clock/ID generator, no external I/O, no credentials, no
@@ -155,7 +199,9 @@ mutate stored facts. Callback errors return unchanged and have no committed effe
 Actor shape validation is mandatory but is not authentication: AccountID is
 nonempty valid UTF-8, at most 256 bytes, with no control characters; RequestID is
 1..128 printable ASCII bytes; Operation is one of the existing allowlisted
-mutation operation names (including `import`); At is a nonzero UTC instant.
+mutation operation names (including `import`) plus proposed `put_resource` and
+`delete_resource` domain operations; At is a nonzero UTC instant. Combined
+record/resource writes retain the admitted domain operation's name.
 These bounds apply equally to synthetic fixtures. The boundary remains
 responsible for establishing the actor; passing shape checks grants no authority.
 
@@ -194,7 +240,8 @@ Revision begins at 0 per Scope and increments exactly once on every successful
 editor command including no-op and import. No successful command increments it
 twice; reads, dry-runs and refusals never increment it. Overflow at max uint64
 refuses without callback or mutation. Exactly one event is stored at the new
-counter with the same Scope, Actor and sorted distinct changed IDs. Event here
+counter with the same Scope, Actor, sorted distinct changed IDs and changed
+resource digests. Event here
 records v1-style facts, not a digest-bearing D6 journal or authenticated history.
 Old events are immutable through the product API. A storage administrator can
 rewrite storage; a provider is not an independent attestation system.
@@ -212,7 +259,8 @@ initial supported topology; no network FS, HA, replication or distributed
 transaction claim follows from the word database.
 
 Provider snapshot Elements sort by bytewise stored full ID; Provenance by path;
-Commit.ChangedIDs sorted unique; events ascending revision. Nested checklist,
+Snapshot.Resources and Checkpoint.Resources sort by digest; both changed-ID
+arrays sort unique; events ascending revision. Nested checklist,
 resource and edge arrays preserve stored order. Domain computes the same graph,
 counts, filters and plans on the same complete snapshot for either provider.
 Providers do not implement a second DSL/query engine.
@@ -230,11 +278,16 @@ one View, never several provider reads.
 ## P6. Transaction, durability and recovery
 
 All facts affected by one domain ChangeSet, deletes, provenance replacement,
-revision and event share one commit decision. Provider validation precedes that
+resource bytes/membership/references, revision and event share one commit decision. Provider validation precedes that
 decision. Nil provenance means unchanged; nonnil empty means replace with empty.
 An empty accepted ChangeSet still advances revision and writes one empty-ID event.
 Duplicate case-folded upserts, duplicate deletes, intersecting upsert/delete IDs,
 unknown deletes, malformed records or bad provenance digest/path refuse atomically.
+The provider validates resources and the resulting reference graph before this
+decision. Resource-only updates have empty ChangedIDs and the actual changed
+digest list; facts-only updates have empty ChangedResourceIDs. Both nil and
+empty PutResources/DeleteResources mean no resource change. No resource bytes
+appear in events; retained accepted/returned resource slices cannot mutate state.
 
 Before the durable decision, callback/validation/cancellation/faults leave the
 previous logical state and journal intact. After the durable decision, a crash
@@ -257,18 +310,25 @@ reciprocal overlay, move recovery and fault mechanisms as reusable components.
 Add one provider commit envelope spanning **the complete** ChangeSet plus scoped
 revision/event; a mutex alone, pair-only generation counter, sequential
 WriteReadme/WriteProgress calls or a non-authorizing write journal is insufficient.
-FS logical reads use that envelope/lock or return unavailable until recovery;
-external legacy readers/writers of the live tree are outside the service boundary
-and must be stopped before adoption. Unreadable/unknown meaningful fields refuse
-rather than being omitted. Do not call legacy LoadBoard's execution/CR-derived
-authority hooks from the provider. Preserve any non-product fields as explicit
-inert provenance only when an approved compatibility mapping is lossless;
-otherwise block import/adoption, never silently discard them.
+FS logical reads use that envelope/lock or return unavailable until recovery.
+Existing filesystem behavior and source bytes remain unchanged by this spec.
+The future adapter must preserve existing markdown, paths, field/array behavior
+and recovery guarantees; no existing board is opened or rewritten here. Strict
+server reads must not silently omit unreadable facts. Execution/CR-derived
+authority hooks are outside this provider protocol; existing upstream behavior
+is not changed by that boundary. If faithful adaptation exposes an incompatibility,
+report its exact source seam for protocol review; do not introduce a conversion
+project, sanitizer or migration prerequisite.
 
 Default proposed limits, for parity: 10,000 Elements per Scope; 64 MiB compact
 UTF-8 serialized Snapshot (protocol key/record order, described below); 64 MiB
 complete serialized event NDJSON including LF; 8 MiB per provenance payload;
-existing network query/archive limits remain 8/64 MiB. Charge sizes before
+10,000 resources and 64 MiB total raw resource bytes per Scope, 8 MiB per
+resource, 64 MiB complete canonical ChangeSet and 256 MiB complete canonical
+Checkpoint (including base64 payload expansion and event arrays). Existing
+network query/archive limits remain unchanged, including the 8 MiB query body;
+future resource wire routes must enforce their own explicit common cap and the
+provider caps before allocation. No route is implemented or enabled here. Charge sizes before
 unbounded decoding/accumulation and refuse, never truncate. This strengthens the
 old store's raw allocation limits and requires validation in both adapters.
 Limit changes belong to the common contract, not server tuning that changes
@@ -282,12 +342,30 @@ in P2 with snake_case keys; nested Scope `{product_id,board_id}`, Revision
 the exact existing native-v1 declaration/tag order and nullable facts; optional
 review/task_class retain omitempty. Provenance `{path,sha256,data}` uses lowercase
 SHA256, standard padded base64 for bytes. Snapshot/ChangeSet field names are
-`board,revision,elements,provenance` / `upserts,deletes,provenance`; Board is
-`{scope,name,description}`. Commit is `{revision,changed_ids}`; Event is
-`{format_version,scope,revision,actor,changed_ids}`. UTC times use RFC3339Nano.
+`board,revision,elements,provenance,resources` /
+`upserts,deletes,provenance,put_resources,delete_resources`; Board is
+`{scope,name,description}`. Commit is `{revision,changed_ids,changed_resource_ids}`;
+Event is `{format_version,scope,revision,actor,changed_ids,changed_resource_ids}`.
+ResourceInfo is `{sha256,size}`; Resource is `{info,data}` with standard padded
+base64 Data, including empty string for empty bytes. Checkpoint is
+`{snapshot,events,resources}`. UTC times use RFC3339Nano.
 Top-level empty arrays are explicit `[]`, except ChangeSet.provenance nil is
-`null`. Element nested null/empty distinctions stay as stored. Protocol runner
+`null`. Normalize nil resource change lists to `[]` for canonical encoding.
+Element nested null/empty distinctions stay as stored. Protocol runner
 owns canonical vectors; adapters may use different internal encodings.
+
+Common proposed operation bounds: default 5-second provider deadline if absent,
+and cap longer caller deadlines at 5 seconds; lock acquisition at most 2 seconds
+within that budget. Cancellation before the commit decision leaves old state;
+after it, the outcome rules above apply. The trusted callback must cooperate
+with its bounded execution budget; these are not a claim that Go can forcibly
+interrupt arbitrary code. Close stops admission immediately and drains to a
+documented shutdown deadline (proposed 30 seconds); on expiry return unavailable
+while retaining handles needed by unfinished operations, not a false successful
+close. Recovery/startup have a separately reported finite budget (proposed 30
+seconds); failure retains evidence and readiness stays unavailable. Qualify
+actual elapsed times for both providers. No unbounded wait, retry loop or
+total-memory guarantee follows from these caps.
 
 ## P7. Capability and admission at the server boundary
 
@@ -326,8 +404,7 @@ Proposed server config shape (schema example only, not accepted CLI flags):
   "storage": {
     "provider": "filesystem",
     "filesystem": {"root": "/absolute/server-owned/board-state"}
-  },
-  "legacy_product_id": "explicit-product"
+  }
 }
 ```
 
@@ -339,8 +416,8 @@ fallback on failure, mixed per-request provider or hot switch. Storage root is
 absolute, canonical, service-owned, private, unaliased and separate from policy,
 runtime sockets and export destination. DB secret acquisition, if needed, is an
 explicit protected server integration and never a client/provider payload/log.
-Backend change requires stopped writer, new target, approved checkpoint/import,
-reconciliation and separate owner authorization. No automatic data copying.
+No backend switching or existing-data copying is part of this protocol work.
+Config selection specifies a server implementation; it never transforms data.
 
 Proposed wire extension: explicit `/v2/products/{productID}/boards/{boardID}`
 prefix for q/export/import and a scoped authorized board catalog. Query/domain
@@ -349,26 +426,16 @@ operation names retain existing behavior. Proposed v2 ETag/If-Match syntax is
 Scope JSON bytes defined in P6, followed by canonical unsigned decimal Counter
 (no leading zeros except 0). Reject weak tags, `*`, multiple values, malformed
 values and a digest unequal to the route's exact Scope as `invalid_request`.
-This binds the full Scope and Counter; a tag from another scope refuses. v1 routes
-may remain only with one explicitly configured `legacy_product_id`; scope is
-injected server-side, with product-aware authorization, never chosen by a header
-or default. v1 revision tags remain target-URI preconditions, never authority.
-Without that explicit compatibility mapping v1 board operations refuse; public
-health/version behavior does not imply v1 data readiness. No current client
-silently guesses a product. Product-aware projection/client/API work is owned by
-the integrator and must be reviewed together, before either backend is adopted.
-
-Persistent scoped schema is new. Existing schema-v1 DB metadata and native-v1
-archives have no ProductID; do not reinterpret them in place. Proposal: retain
-legacy read-only/export tools; import approved checkpoint into a new empty
-explicit Scope with source digest/mapping recorded, new revision-1 local event,
-old journal retained as inert provenance, no fabricated historical product
-identity. Native-v2 scoped transfer format requires the shared compatibility
-producer's reviewed contract before implementation; the proposed scoped ETag
-syntax above must be reviewed with the product-aware client/server changes;
-they are not prerequisites to testing the provider module with synthetic values.
-No existing DB/schema/archive file is changed by this draft. Existing unsigned
-maintenance exports remain unsigned; D6 digest/signature/migration gates stay held.
+This binds the full Scope and Counter; a tag from another scope refuses.
+Existing v1 behavior is unchanged by this documentation revision. Product-aware
+projection/client/API details, including bounded remote resource operations, are
+future shared integration work after protocol review, not a second client-side
+storage implementation. A future server must obtain explicit full scope from
+reviewed server configuration/routing; it cannot guess a product or accept a
+caller filesystem path. No current DB/schema/archive or filesystem board is
+converted, copied or reinterpreted. No new native transfer format or legacy-data
+mapping is proposed here. Unknown persistent formats still refuse as required by
+the existing storage contract; this refusal is not a migration work dependency.
 
 The existing source uses Storm v3.2.1 over bbolt v1.3.4. This is the smallest DB
 reuse candidate, **not** a d205 engine selection. Root must resolve whether to

@@ -1,4 +1,10 @@
-# Observed board state — 2026-11-06 UTC
+# Preserved 399 source observations — 2026-11-06 UTC
+
+The observations below were recorded in sealed 399, before 425's draft PR.
+They are historical evidence, not fresh GitHub/runtime observations in 425.
+425 descends from its exact signed head/tree as bound in README and preserves
+the original packet/receipt. Only documentation is revised; no product tests,
+board binaries, live data, dependency acquisition or conversion work is run.
 
 This is a metadata/source digest, not a runtime audit or deployment approval.
 Sources and exact heads are bound in README. No board server, board CLI command
@@ -56,7 +62,7 @@ activation out of that CLI path (`internal/app/deployment_command.go:90–95`).
 Synthetic verified-TLS constructors are present
 (`internal/app/transports.go:50–65`). None of these source facts closes a runtime
 gate. Shared kernel UID is not per-agent identity/isolation. D6 journal digest,
-external signer custody, real sanitized import/cutover and native durability
+external signer custody and native durability
 remain separate, held claims. A Git commit signature is not an audit signature.
 
 ## What CI and review metadata actually claim
@@ -88,12 +94,19 @@ only document/schema/source-link checks, not Go tests, builds or a board binary.
 
 ## Who is assigned / next gate
 
-Current assigned architect observed from this immutable acceptance:
+Original 399 assigned architect observed from its immutable acceptance:
 `agents2_swarma_dev3`, workbench 399, task `TASK-261107-cpd6wt`, acceptance
 21:32:01.350703 UTC, deadline 22:32:01.350703 UTC. Requested `sol/high`; observed
 model/effort unknown absent attestation. No claim is made about other active
 architects/producers or staffing outside this assignment. No delegation/a2a
 messages were sent.
+
+425 is the same worker identity in a new isolated clone/branch. Its limited
+revision clock is 21:54:04.000983–22:29:04.000983 UTC, bound to the superseding
+no-migration owner batch event in README. No reset of either clock is claimed.
+425 may publish the requested signed draft and send its exact binding through
+its own a2a identity to operators/Sirius. Fresh independent orch-muse semantics
+review remains pending; no adoption, merge or task-board change is authorized.
 
 This result is a proposed contract, shared conformance contract/matrix and two
 separate implementation briefs. Root must arrange independent exact-head review,

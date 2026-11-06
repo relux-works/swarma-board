@@ -7,6 +7,11 @@ DB producer is released. A producer may not change vectors, omit inconvenient
 cases or weaken assertions. The contract owner implements one runner consumed
 unchanged by both factories. No test runner/product code is added in this unit.
 
+425 revises the contract to 41 proposed cases. C33–C40 cover first-class scoped
+resources and C41 common operation bounds. The no-migration owner decision
+supersedes conversion proposals in 399. No conformance case has been executed;
+both adapters and the shared runner are next separate workbenches after review.
+
 ## Runner boundary
 
 Future runner entrypoint: `conformance.Run(t, Factory, FaultDriver)` in the
@@ -48,6 +53,16 @@ These fixture omissions are an authoring shorthand, not a wire/storage default.
 The fixture records are generated once by the contract runner, identically for
 both backends. TASK-a starts with explicit `notEstimated`.
 
+Resource cases add raw empty bytes and ASCII `abc`, with their exact SHA256
+vectors in C33; reference URIs use `sha256:<digest>`. Initial ordinary fixture
+Resources/ChangedResourceIDs are empty arrays. Resource-specific cases seed
+payloads explicitly and compare byte-for-byte, including unreferenced resources.
+Canonical Checkpoint equality includes Snapshot.Resources, payloads, and changed
+resource IDs in events. Never read a live resource tree or fetch an external URI.
+Bounds cases test each reachable at-bound/one-over condition with other limits
+satisfied; a redundant whole-Checkpoint guard may be tested at the encoder budget
+boundary rather than claiming an unreachable fixture satisfies all lower caps.
+
 Actors use `account_id=synthetic-editor`, `operation=set_notes`, fixed UTC time
 `2026-11-06T00:00:00Z`, request IDs `seed`, `one`, `two`, etc. The seed operation
 is `create`; use read-only synthetic grants for denied/read tests. `old` means the
@@ -69,7 +84,7 @@ Fault stages are logical: `before_decision` (no durable commit record),
 `during_recovery`. A producer supplies a written mapping to real engine/FS
 points. If it cannot place/justify a stage, that case is **NOT VERIFIED**, not
 skipped/pass. Extra FS phases (journal sync, first/last file write, revision/event
-publication, parent sync and cleanup) are mandatory subcases of the common
+publication, resource payload/membership publication, parent sync and cleanup) are mandatory subcases of the common
 atomicity cases. DB maps equivalent stages to real transaction/fault points.
 
 Definite pre-decision failure must give `old`. Post-decision crash before ack

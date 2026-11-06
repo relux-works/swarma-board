@@ -3,6 +3,8 @@
 Task parent: `TASK-261107-cpd6wt` extending `mo58kt`. Root staffs this separate
 producer after the common contract is independently reviewed. This brief neither
 launches a worker nor chooses a database engine.
+This is a next separate workbench after protocol review, not implementation work
+inside 425. No migration, sanitizer or pilot work is proposed or required.
 
 Immutable board base: `relux-works/swarma-board`
 `a1b87160b509732125ea8a6b21ade43321ffd8fc`, tree
@@ -27,7 +29,7 @@ First obtain root/source-owner's engine disposition. Retaining Storm/bbolt is
 the lowest source delta candidate because the existing implementation already
 supplies most transaction mechanics. If another engine is chosen, require a
 separate exact dependency/config/custody and transaction design decision. Do not
-assume PostgreSQL, SQLite, a network service, SQL, a DSN shape, a migration tool,
+assume PostgreSQL, SQLite, a network service, SQL, a DSN shape,
 new credentials or extra infrastructure. Do not download or upgrade dependencies
 until approved exact pins and canonical h1 validation are available.
 
@@ -39,13 +41,21 @@ must reject a mismatched scope; same board/task IDs in two products must coexist
 Keep task validation/plans/filtering in the common domain layer. No DB-specific
 query results, status transitions or transaction retry of callbacks.
 
-Persistent schema disposition comes before opening existing data in a new mode.
 Current v1 metadata only has project identity and revision; current audit is
-Revision/Context/ChangedIDs. Never silently prepend a default product, recast old
-events with invented scope or initialize unknown storage. The proposed path is
-new empty explicitly scoped storage and separately approved read-only export /
-validated import. Preserve old v1 tools and bytes. Native scoped transfer/ETag
-details are owned by the shared compatibility producer, not this adapter.
+Revision/Context/ChangedIDs. Preserve existing source behavior and bytes. This
+adapter brief is for synthetic, explicitly scoped new state against the reviewed
+protocol. It neither opens existing data in a new mode nor defines a conversion,
+archive mapping or transfer format. Unknown formats still refuse without
+initialization. No earlier migration request remains a work dependency.
+
+Implement first-class scoped content-addressed resources in the same durable
+transaction: ResourceInfo/Resource, ReadResource, PutResources, DeleteResources,
+record references, resource membership, revision and changed-resource event IDs.
+Verify SHA256/size on put and read; coherent Checkpoint includes exact resource
+bytes. Same digest in another product/project is independent. Resource-only
+updates still use CAS and one event. No separate blob service, URI fetch, hidden
+transaction retry or resource GC. Enforce all common count/byte/time bounds;
+engine-specific encoding cannot change observable parity.
 
 One transaction must include CAS, all accepted changes, provenance, exactly one
 revision increment and event. Enforce immutable earlier events, typed safe
@@ -66,7 +76,8 @@ their extraction/move to this producer; do not create concurrent shared writers.
 Run the same provider cases C01–C22 and applicable C31 subcases; the shared
 integrator runs C23–C30 against both providers. Fault placement C13–C16 must map
 to actual transaction boundaries, not a fake method returning an error after
-an unrelated successful write. C32 native durability stays a separate evidence
+an unrelated successful write. C33–C41 cover resources/bounds/deadlines.
+C32 native durability stays a separate evidence
 claim. Existing tests are starting witnesses, not proof of the new product-scope
 or module contract. No result from the old suite automatically passes a new case.
 

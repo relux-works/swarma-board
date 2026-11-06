@@ -20,6 +20,9 @@ replace this pin with a floating branch or read peer conversations for it.
 Consume the reviewed standalone provider module and common runner supplied by
 the shared contract owner. The current draft is not authorization to implement
 against unreviewed choices or to change an old contract unilaterally.
+This is a next separate workbench after protocol review, not implementation work
+inside 425. The superseding owner decision is no migration. Existing filesystem
+behavior remains; there is no sanitizer, pilot or data-conversion dependency.
 
 ## Preserve the existing design
 
@@ -49,7 +52,8 @@ formats and recovery components where they meet the shared contract.
 This is a narrow architectural piece, not an evidence-backed claim that its
 durability implementation is trivial or already complete. The producer must map
 the **whole** ChangeSet (including arbitrary multi-record updates, deletes,
-provenance, revision and event) to one durable decision; pair-only journals and
+provenance, content-addressed resource bytes/membership/references, revision and
+event) to one durable decision; pair-only journals and
 process-local locks alone cannot satisfy it. If the current recovery mechanisms
 cannot be composed without weakening their guarantees, stop with a precise
 design delta for the contract owner; do not weaken parity or discard the FS work.
@@ -68,8 +72,18 @@ attributed extraction of storage/markdown/recovery components into the assigned
 adapter, retaining LICENSE/NOTICE and exact provenance. Leave the upstream
 repository unchanged. Do not transplant its CLI, sessions, Change Request
 authority, runtime goals, credential discovery or hidden control-root fallback.
-Unknown meaningful legacy facts require an explicit compatibility disposition;
-they are never silently dropped.
+Existing meaningful fields and markdown behavior must be preserved; a mismatch
+is a precise protocol/adaptation question, not permission to drop fields or
+invent an existing-data conversion project.
+
+Implement the same ResourceInfo/Resource, ReadResource, PutResources and
+DeleteResources contract as DB. Digest-derived server storage never accepts a
+caller path; same digest in another product/project grants no lookup. Preserve
+existing resource mechanisms where compatible. Blob publication, record refs,
+membership, CAS and event share the complete commit envelope. ReadResource and
+Checkpoint verify digest/size and return detached bytes. Reject corruption and
+all common count/byte/time limits without truncation. No URI fetch, unpacking or
+implicit garbage collector. No existing resource tree is converted by this brief.
 
 ## Ownership and acceptance
 
@@ -81,7 +95,8 @@ No new dependency or version upgrade without a reviewed exact-pin disposition.
 
 Use fresh synthetic state only. Run every shared provider case C01–C22 and C31,
 plus FS fault subcases in C13–C16; the integrator runs C23–C30 for both factories.
-C32 needs actual native filesystem/host authority. Preserve existing markdown,
+C32 needs actual native filesystem/host authority. Run C33–C41 too: resource
+integrity/isolation/atomicity/bounds and common operation deadlines. Preserve existing markdown,
 recovery, unsafe-path and non-authorizing-journal witnesses where meaningful;
 do not duplicate implementation-shaped tests merely to increase test counts.
 Explicitly show that identical task/board IDs in alpha and beta never alias
