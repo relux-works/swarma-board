@@ -628,7 +628,7 @@ there is no legacy-data mapping. Unknown persistent formats still refuse as requ
 the existing storage contract; this refusal is not a migration work dependency.
 
 The existing source uses Storm v3.2.1 over bbolt v1.3.4. This is the smallest DB
-reuse candidate, **not** a d205 engine selection. Root must resolve whether to
+reuse candidate, **not** an owner engine selection. Root must resolve whether to
 retain that engine before DB dependency/driver implementation. Neither SQL nor
 another database is invented here. Scope schema/version, packaging and wire
 compatibility are review decisions, explicitly recorded in decisions.json.

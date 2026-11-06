@@ -1,10 +1,8 @@
 # Database producer brief — held until contract review and engine decision
 
-Task parent: `TASK-261107-cpd6wt` extending `mo58kt`. Root staffs this separate
-producer after the common contract is independently reviewed. This brief neither
-launches a worker nor chooses a database engine.
-This is a next separate workbench after protocol review, not implementation work
-inside 425. No migration, sanitizer or pilot work is proposed or required.
+Implementation follows independent review of the common contract. This brief
+neither launches implementation nor chooses a database engine. No migration,
+sanitizer or pilot work is proposed or required.
 
 Immutable board base: `relux-works/swarma-board`
 `a1b87160b509732125ea8a6b21ade43321ffd8fc`, tree
@@ -16,7 +14,7 @@ domain logic, records, error semantics or expected test results.
 
 | Mechanism | Exact source / implication |
 | --- | --- |
-| Current pins | [`go.mod:1–17`](https://github.com/relux-works/swarma-board/blob/a1b87160b509732125ea8a6b21ade43321ffd8fc/go.mod#L1-L17): Storm v3.2.1, bbolt v1.3.4, Go 1.25.5. These are observed pins, not a d205 decision about the future DB implementation. |
+| Current pins | [`go.mod:1–17`](https://github.com/relux-works/swarma-board/blob/a1b87160b509732125ea8a6b21ade43321ffd8fc/go.mod#L1-L17): Storm v3.2.1, bbolt v1.3.4, Go 1.25.5. These are observed pins, not an owner decision about the future DB implementation. |
 | Existing repository seam | [`internal/contract/contract.go:36–61`](https://github.com/relux-works/swarma-board/blob/a1b87160b509732125ea8a6b21ade43321ffd8fc/internal/contract/contract.go#L36-L61) already has detached snapshots, ChangeSet callback, revision CAS and lifecycle. Extend ownership into the accepted module instead of duplicating types. |
 | Private/schema-aware open | [`internal/store/store.go:49–136`](https://github.com/relux-works/swarma-board/blob/a1b87160b509732125ea8a6b21ade43321ffd8fc/internal/store/store.go#L49-L136) uses 0600 files, O_EXCL for new storage, finite 2-second bbolt open timeout, schema checks before Storm initialization. Preserve refusal of legacy/unknown files. |
 | Real transaction | [`store.go:182–314`](https://github.com/relux-works/swarma-board/blob/a1b87160b509732125ea8a6b21ade43321ffd8fc/internal/store/store.go#L182-L314) reads revision, calls once, writes facts/provenance/audit/revision in one bbolt write transaction. Adapt, do not replace it with an in-memory mutex plus separate writes. |
@@ -48,8 +46,8 @@ protocol. It neither opens existing data in a new mode nor defines a conversion,
 archive mapping or transfer format. Unknown formats still refuse without
 initialization. No earlier migration request remains a work dependency.
 Exception to the historical no-transfer-addition wording: the shared integrator
-now owns P3's explicit bounded native-v2 payload export/reimport, binding Sirius's
-498 revision decision. It is not an adapter-specific format or legacy mapping.
+now owns P3's explicit bounded native-v2 payload export/reimport, as required
+by the owner decision. It is not an adapter-specific format or legacy mapping.
 
 Implement first-class scoped content-addressed resources in the same durable
 transaction: ResourceInfo/Resource, ReadResource, PutResources, DeleteResources,

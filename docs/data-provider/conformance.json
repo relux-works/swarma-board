@@ -4,8 +4,6 @@
   "status": "proposal-not-executed",
   "board_base": "a1b87160b509732125ea8a6b21ade43321ffd8fc",
   "fs_base": "09bac3d89822c9b83c04dff6483d7b2074097a82",
-  "revision_authority": "$g9e8CZ9Gkq7f16A8A5-QoNzarXxrA0hhbwju5CAdmRM",
-  "reviewed_previous_head": "fd0f0555e615e7f853514ed8c2c5ee8dd6e8c8b9",
   "limits": {
     "elements": 10000, "snapshot_bytes": 134217728,
     "event_ndjson_bytes": 268435456, "event_warning_bytes": 241591910,

@@ -1,11 +1,8 @@
-# PR4 old-semantics review dispositions — revision 498
+# Contract review dispositions
 
-This source-only revision responds to all ten findings conveyed by Sirius event
-`$g9e8CZ9Gkq7f16A8A5-QoNzarXxrA0hhbwju5CAdmRM`, exact sender
-`@meta-keeper.keeper-sirius:gr.relux.works`, 2026-11-06 22:55:14 UTC. It contains
-orch-muse's review of PR4 `fd0f0555e615e7f853514ed8c2c5ee8dd6e8c8b9` by
-**Claude Opus 5.5**, separate from the producer. The owner binds findings 1/2;
-other choices below are explicit proposals requiring fresh independent review.
+This source-only revision responds to all ten prior findings. The owner binds
+findings 1/2; other choices below are explicit proposals requiring fresh
+independent review. Independent review pending.
 
 | Finding | Explicit disposition | Contract / future verification |
 | --- | --- | --- |
@@ -14,7 +11,7 @@ other choices below are explicit proposals requiring fresh independent review.
 | 3 — lifecycle/refcount | Shared domain computes resulting same-scope counts; positive-to-zero deletion and named replacement reclaim quota in the same Update. Shared refs retain bytes; explicitly unreferenced puts need explicit deletion. No hidden provider GC. | P2/P6; C43 through C13–C16. Provider independently validates refs; temporary physical space/reclaim separately disclosed. |
 | 4 — limits/recovery | 32 MiB/resource; 256 MiB raw/scope; 128 MiB Snapshot; 256 MiB events; 512 MiB ChangeSet; 1,024 MiB Checkpoint; 10,000 counts; 8 MiB/provenance. Changed bounds, not old parity. Reviewer mixed-tree totals and old 25 MiB upload justify headroom only. | P6 table; C19/C37/C46. Cleanup with event headroom; 90% event warning; terminal event stream stays read-only/exportable without reset, compaction or hidden rollover. Explicit recovery at every cap. |
 | 5 — text-only | Provider opaque/binary-capable; domain rejects any NUL payload before put/import with resource_binary_refused, retaining old FS policy. No added payload UTF-8 restriction. Old remote binary behavior is deliberately narrowed. | P2/P4; C44 tests both layers separately. |
-| 6 — strict FS/notes | Only new recognized-schema provider trees open; legacy stays old task-board. Unknown unrepresentable sections/incomplete pairs refuse unchanged. Openability is a later-script target only. Review's real notes reproduction is acknowledged; actual unit451/PR5 is composed. | P6; C31/C49; followups.md attributes 1242/1244 and 18-directory reviewer counts, names exact merged PR5. No private dataset run here. |
+| 6 — strict FS/notes | Only new recognized-schema provider trees open; legacy stays old task-board. Unknown unrepresentable sections/incomplete pairs refuse unchanged. Openability is a later-script target only. Review's real notes reproduction is acknowledged; merged PR5 is composed. | P6; C31/C49; followups.md attributes 1242/1244 and 18-directory reviewer counts, names exact merged PR5. No private dataset run here. |
 | 7 — rename/reparent | Rename epic/story containers, reparent story subtree, and cover descendant physical paths without adding logically unchanged descendants to ChangedIDs. | P6; C45 repeats every real C13–C16 stage, collision and recovery-kill/double-reopen; DB shares oracle. |
 | 8 — history | Per-element activity history deliberately dropped. Actor + changed IDs cannot reconstruct field deltas/old values; imported activity is inert. | P5; C48. Future history needs separate reviewed scope/API/retention. |
 | 9 — v1 routes | Exactly one explicit configured v1_product_id; absent disables v1, invalid fails startup. Full-pair authorization/internal revision binding; v2 never falls back. | P8; C30/C47; v1 resource export refuses without negotiated payload form. Wire/auth review remains. |
@@ -31,6 +28,5 @@ worker's measurements. The revised DB brief/wire/oracles need fresh review; the
 old verdict does not cover them. C01–C50 remain unexecuted contract cases.
 Document validation and a narrow Encode witness do not qualify native-v2, either
 provider, durability, auth, Mac behavior, production transport/admission or
-activation. **Zero runtime qualification is claimed.** Root must return the
-signed new head/tree and document hashes through Sirius to orch-muse before
-freeze; no adoption or landing is authorized here.
+activation. **Zero runtime qualification is claimed.** Fresh independent review must bind the
+signed new head/tree and document hashes before freeze; no adoption or landing is authorized here.

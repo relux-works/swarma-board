@@ -1,8 +1,8 @@
 # Filesystem producer brief — held until contract review
 
-Task parent: `TASK-261107-cpd6wt` extending `mo58kt`. No producer is staffed or
-authorized by this brief. Root assigns the producer after the common contract
-review, using the exact accepted spec/conformance digest and signed base.
+Implementation follows independent review of the common contract, using the
+exact accepted spec/conformance digest and signed base. This brief does not
+authorize implementation.
 
 ## Immutable inputs
 
@@ -20,10 +20,10 @@ replace this pin with a floating branch or read peer conversations for it.
 Consume the reviewed standalone provider module and common runner supplied by
 the shared contract owner. The current draft is not authorization to implement
 against unreviewed choices or to change an old contract unilaterally.
-This is a next separate workbench after protocol review, not implementation work
-inside 425. The superseding owner decision is no migration. Existing filesystem
+Implementation is separate work after protocol review. The superseding owner
+decision is no migration. Existing filesystem
 behavior remains; there is no sanitizer, pilot or data-conversion dependency.
-498 composes merged PR5 `d2e3d201939aa88c6acdaa09bf0dcee157928b18`; the old
+This draft composes merged PR5 `d2e3d201939aa88c6acdaa09bf0dcee157928b18`; the old
 pins above remain source-semantics references. Read review-disposition.md and
 the revised common limits/native-v2 contract before implementation admission.
 

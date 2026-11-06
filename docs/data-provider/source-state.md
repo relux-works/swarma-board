@@ -1,29 +1,15 @@
-# Preserved 399 source observations — 2026-11-06 UTC
+# Source observations — 2026-11-06 UTC
 
-**498 revision boundary:** historical 399/425 observations below are not fresh
-main/PR/runtime claims. Current composition is main
-`d2e3d201939aa88c6acdaa09bf0dcee157928b18` (merged PR5) plus PR4 documentation;
-see review-disposition.md for exact prior PR4 head and all ten findings. PR6/492
-remains separately owned. No product source/module/dependency changes relative
-to composed main, full Go suite, board binary, server or private-board run are
-part of 498. Any narrow URI witness is bound only to the exact source/commands in
-the exported receipt, and constitutes zero runtime qualification.
-
-The observations below were recorded in sealed 399, before 425's draft PR.
-They are historical evidence, not fresh GitHub/runtime observations in 425.
-425 descends from its exact signed head/tree as bound in README and preserves
-the original packet/receipt. Only documentation is revised; no product tests,
-board binaries, live data, dependency acquisition or conversion work is run.
-
-This is a metadata/source digest, not a runtime audit or deployment approval.
-Sources and exact heads are bound in README. No board server, board CLI command
-or product test/helper was executed; no private runtime board data was read.
-The only executed helper is the packet's own offline document validator and its
-confinement probe. No dependency acquisition was necessary for a docs-only draft.
+These are historical source and metadata observations, not fresh runtime claims.
+The documentation composes main `d2e3d201939aa88c6acdaa09bf0dcee157928b18`
+(merged PR5); PR6 remains separate. No product source/module/dependency changes
+relative to that main, full Go suite, board binary, server or private-board run
+are part of this draft. Prior narrow URI witness evidence constitutes zero
+runtime qualification. Sources and exact heads are bound in README.
 
 ## What exists in source
 
-`swarma-board` is a private repository with default `main` at
+`swarma-board` was observed with default `main` at
 `a1b87160b509732125ea8a6b21ade43321ffd8fc`. Source includes separate client and
 server commands, an authenticated HTTP boundary, domain/query/transfer logic,
 Storm/bbolt per-project durable storage, handle leases, CAS, coherent v1 audit
@@ -45,21 +31,13 @@ the board provenance. Its `pkg/board/DataStore` and
 locks, pair/move/activity recovery and non-authorizing write journals. These are
 the concrete existing FS mechanisms to preserve. Open-PR and relevant branch
 **metadata** were inventoried; no explicit new FS-provider PR/head was identified.
-No task descriptions, activity content, conversations or peer workbenches were
-opened. If root has another FS candidate packet, its exact source custody remains
-a required input before claiming this inventory is exhaustive.
+The source custodian must confirm any other intended FS candidate before this
+inventory can be considered exhaustive.
 
 ## What actually runs / what is not verified
 
-At 21:41:52 UTC a read-only current-host check of the `agent` user's process
-**command names only** found no `board`/`curator` match. `command -v` found no
-`task-board`, `swarma-board`, `swarma-board-server` or `curator` in this session's
-PATH. This bounded observation cannot establish other users/hosts, renamed
-processes, non-PATH installations or service health. No sockets, task data,
-credentials, foreign process arguments, runtime logs or live API were inspected.
-
 The task input says the existing Curator wrapper is thin and is not a board
-process. This unit did not inspect that wrapper or observe it executing. It is
+process. The wrapper was not inspected or observed executing. It is
 not evidence of an activated board service. Source constructors and deployment
 descriptors show possible behavior, not that a process is running. Actual
 deployment identity/version, service supervisor, endpoint readiness, client use,
@@ -83,8 +61,8 @@ check or a running CI job). The workflows content query returned HTTP 404.
 Branch-protection query returned HTTP 403 indicating plan/visibility limitations;
 no upgrade or visibility change was attempted. Therefore required-check policy
 could not be established through that API. This unit does **not** assign the
-board `COMPLETE_NO_REQUIRED_CHECKS`; the task's analogous Services disposition
-is not authority for this repository.
+board `COMPLETE_NO_REQUIRED_CHECKS`; another repository's disposition
+does not establish policy for this repository.
 
 PR #3 has a COMMENTED review record describing an independent exact-head review
 of `a1b87160...` / tree `03ac0349...` for bounded provenance cleanup. That record
@@ -101,24 +79,11 @@ rollback, crash atomicity, checkpoints, Unix/TLS and Darwin exist. Test existenc
 old claims and merged PR state are distinct from a current pass. This unit runs
 only document/schema/source-link checks, not Go tests, builds or a board binary.
 
-## Who is assigned / next gate
+## Next gate
 
-Original 399 assigned architect observed from its immutable acceptance:
-`agents2_swarma_dev3`, workbench 399, task `TASK-261107-cpd6wt`, acceptance
-21:32:01.350703 UTC, deadline 22:32:01.350703 UTC. Requested `sol/high`; observed
-model/effort unknown absent attestation. No claim is made about other active
-architects/producers or staffing outside this assignment. No delegation/a2a
-messages were sent.
-
-425 is the same worker identity in a new isolated clone/branch. Its limited
-revision clock is 21:54:04.000983–22:29:04.000983 UTC, bound to the superseding
-no-migration owner batch event in README. No reset of either clock is claimed.
-425 may publish the requested signed draft and send its exact binding through
-its own a2a identity to operators/Sirius. Fresh independent orch-muse semantics
-review remains pending; no adoption, merge or task-board change is authorized.
-
+Independent review pending. No adoption, merge or task-board change is authorized.
 This result is a proposed contract, shared conformance contract/matrix and two
-separate implementation briefs. Root must arrange independent exact-head review,
-resolve engine/source-custody/module/compatibility decisions, freeze the shared
-contract digest and staff the two producers afterward. Production activation is
-not part of this assignment. No merge is authorized here.
+separate implementation briefs. The contract owner must arrange independent
+exact-head review, resolve engine/source-custody/module/compatibility decisions,
+freeze the shared contract digest and staff the two implementations afterward.
+Production activation is not part of this draft. No merge is authorized here.
