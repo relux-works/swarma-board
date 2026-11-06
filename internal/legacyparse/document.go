@@ -85,6 +85,12 @@ func parseMarkdownDocument(content string, allowTitle bool) (*markdownDocument, 
 			}
 		case 2:
 			normalized := normalizeHeading(name)
+			// Notes may contain hand-authored Markdown headings. Only known
+			// progress fields end that free-text field; unknown headings outside
+			// Notes still become sections and are refused by Parse.
+			if !allowTitle && len(doc.sections) > 0 && doc.sections[len(doc.sections)-1].normalized == "notes" && progressFields[normalized] == "" && removed[normalized] == "" {
+				continue
+			}
 			if normalized == "" {
 				return nil, fmt.Errorf("empty section heading on line %d", lineIndex+1)
 			}
