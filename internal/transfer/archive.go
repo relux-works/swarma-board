@@ -11,6 +11,7 @@ import (
 	"hash"
 	"io"
 	"path"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
@@ -24,8 +25,9 @@ const (
 )
 
 // The raw block gate prevents archive/tar's transparent PAX/GNU processing
-// from hiding special entries, allocations or entry counts. archive/tar still
-// validates and interprets each accepted ordinary USTAR/V7 header.
+// from hiding special entries, allocations or entry counts. A local PAX header
+// may carry exactly one path record, bounded before allocation; archive/tar
+// validates it together with the next ordinary header before safePath runs.
 func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string, string, error) {
 	digest := sha256.New()
 	cr := &budgetReader{ctx: ctx, r: r, max: MaxCompressed, h: digest}
@@ -41,12 +43,16 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 	seen := map[string]bool{}
 	dirs := map[string]bool{}
 	count := 0
+	var paxHeader []byte
 	for {
 		block := make([]byte, 512)
 		if _, err = io.ReadFull(er, block); err != nil {
 			return nil, nil, "", archiveError(ctx, "truncated or oversized tar", err)
 		}
 		if allZero(block) {
+			if paxHeader != nil {
+				return nil, nil, "", invalid("orphan archive path header")
+			}
 			if _, err = io.ReadFull(er, block); err != nil || !allZero(block) {
 				return nil, nil, "", invalid("invalid tar terminator")
 			}
@@ -67,7 +73,7 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 		if count > MaxEntries {
 			return nil, nil, "", invalid("archive entry limit")
 		}
-		if block[156] != 0 && block[156] != tar.TypeReg && block[156] != tar.TypeDir {
+		if block[156] != 0 && block[156] != tar.TypeReg && block[156] != tar.TypeDir && block[156] != tar.TypeXHeader {
 			return nil, nil, "", invalid("archive special entry refused")
 		}
 		// Bytes after a NUL in a header's pathname field cannot hide a second name.
@@ -76,15 +82,38 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 				return nil, nil, "", invalid("noncanonical tar pathname")
 			}
 		}
-		tr := tar.NewReader(bytes.NewReader(block))
+		if block[156] == tar.TypeXHeader {
+			if paxHeader != nil || !allZero(block[157:257]) {
+				return nil, nil, "", invalid("invalid archive path header")
+			}
+			// Inspect the physical size before archive/tar can consume hidden
+			// metadata. Non-octal encodings are outside this narrow subset.
+			size, e := strconv.ParseInt(strings.Trim(string(block[124:136]), " \x00"), 8, 64)
+			if e != nil || size < 0 || size > MaxEntry {
+				return nil, nil, "", invalid("archive entry size limit")
+			}
+			data, e := readArchiveData(ctx, er, size)
+			if e != nil {
+				return nil, nil, "", e
+			}
+			if !singlePAXPath(data) {
+				return nil, nil, "", invalid("unsupported archive path metadata")
+			}
+			paxHeader = append(block, data...)
+			paxHeader = append(paxHeader, make([]byte, (512-len(data)%512)%512)...)
+			continue
+		}
+		tr := tar.NewReader(io.MultiReader(bytes.NewReader(paxHeader), bytes.NewReader(block)))
 		hdr, e := tr.Next()
 		if e != nil {
 			return nil, nil, "", invalid("invalid tar header")
 		}
 		isDir := hdr.Typeflag == tar.TypeDir
-		if !safePath(hdr.Name, isDir) || hdr.Linkname != "" || len(hdr.PAXRecords) != 0 || len(hdr.Xattrs) != 0 {
+		pathOnly := paxHeader != nil && len(hdr.PAXRecords) == 1 && hdr.PAXRecords["path"] == hdr.Name
+		if !safePath(hdr.Name, isDir) || hdr.Linkname != "" || len(hdr.PAXRecords) != 0 && !pathOnly || len(hdr.Xattrs) != 0 {
 			return nil, nil, "", invalid("unsafe archive path or metadata")
 		}
+		paxHeader = nil
 		key := strings.TrimSuffix(hdr.Name, "/")
 		if seen[key] {
 			return nil, nil, "", invalid("duplicate archive path")
@@ -93,23 +122,13 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 		if hdr.Size < 0 || hdr.Size > MaxEntry || isDir && hdr.Size != 0 {
 			return nil, nil, "", invalid("archive entry size limit")
 		}
-		padded := (hdr.Size + 511) / 512 * 512
-		if er.n+padded > MaxExpanded {
-			return nil, nil, "", invalid("expanded archive limit")
-		}
 		if isDir {
 			dirs[key] = true
 			continue
 		}
-		data := make([]byte, int(hdr.Size))
-		if _, err = io.ReadFull(er, data); err != nil {
-			return nil, nil, "", archiveError(ctx, "truncated archive entry", err)
-		}
-		if padded > hdr.Size {
-			pad := make([]byte, int(padded-hdr.Size))
-			if _, err = io.ReadFull(er, pad); err != nil || !allZero(pad) {
-				return nil, nil, "", invalid("invalid tar padding")
-			}
+		data, e := readArchiveData(ctx, er, hdr.Size)
+		if e != nil {
+			return nil, nil, "", e
 		}
 		files[hdr.Name] = data
 	}
@@ -130,6 +149,37 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 		directoryNames = append(directoryNames, p)
 	}
 	return files, directoryNames, fmt.Sprintf("%x", digest.Sum(nil)), nil
+}
+
+// A single length-framed path record avoids duplicate-key, size, linkpath and
+// other metadata overrides. archive/tar still validates the record and headers.
+func singlePAXPath(data []byte) bool {
+	space := bytes.IndexByte(data, ' ')
+	if space < 1 || data[0] == '0' {
+		return false
+	}
+	n, err := strconv.ParseUint(string(data[:space]), 10, 64)
+	return err == nil && n == uint64(len(data)) && bytes.HasPrefix(data[space+1:], []byte("path=")) && data[len(data)-1] == '\n'
+}
+
+// Every payload, including path metadata and padding, uses the same expanded
+// byte budget. Callers check the physical per-entry size before allocation.
+func readArchiveData(ctx context.Context, er *budgetReader, size int64) ([]byte, error) {
+	padded := (size + 511) / 512 * 512
+	if er.n+padded > MaxExpanded {
+		return nil, invalid("expanded archive limit")
+	}
+	data := make([]byte, int(size))
+	if _, err := io.ReadFull(er, data); err != nil {
+		return nil, archiveError(ctx, "truncated archive entry", err)
+	}
+	if padded > size {
+		pad := make([]byte, int(padded-size))
+		if _, err := io.ReadFull(er, pad); err != nil || !allZero(pad) {
+			return nil, invalid("invalid tar padding")
+		}
+	}
+	return data, nil
 }
 
 type budgetReader struct {
