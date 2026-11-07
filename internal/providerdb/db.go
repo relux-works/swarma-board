@@ -717,7 +717,41 @@ func (d *DB) Update(ctx context.Context, scope dp.Scope, expected dp.Revision, a
 		}
 	}
 	for i, input := range c.PutResources {
-		if payloads.Bucket([]byte(input.Info.SHA256)) != nil {
+		if existing := payloads.Bucket([]byte(input.Info.SHA256)); existing != nil {
+			// Digest and size alone do not establish equality in the contract's
+			// hypothetical collision case. Compare the actual immutable bytes too.
+			if e = verifyChunks(ctx, existing, input.Info); e != nil {
+				return dp.Commit{}, e
+			}
+			f, err := os.Open(paths[i])
+			if err != nil {
+				return dp.Commit{}, safe(err)
+			}
+			buf := make([]byte, chunkSize)
+			err = existing.ForEach(func(_, v []byte) error {
+				if e := checkContext(ctx); e != nil {
+					return e
+				}
+				n, e := io.ReadFull(f, buf[:len(v)])
+				if e != nil || n != len(v) || !bytes.Equal(buf[:n], v) {
+					return dp.NewError(dp.InvalidSnapshot)
+				}
+				return nil
+			})
+			if err == nil {
+				var tail [1]byte
+				n, re := f.Read(tail[:])
+				if n != 0 || re != io.EOF {
+					err = dp.NewError(dp.InvalidSnapshot)
+				}
+			}
+			ce := f.Close()
+			if err == nil {
+				err = ce
+			}
+			if err != nil {
+				return dp.Commit{}, safe(err)
+			}
 			continue
 		}
 		pb, err := payloads.CreateBucket([]byte(input.Info.SHA256))
