@@ -381,7 +381,7 @@ func TestStartupServerBoundsAndCommittedCancellation(t *testing.T) {
 		t.Fatal("typed nil authorizer accepted")
 	}
 	server, e := x.h.Server("127.0.0.1:0")
-	if e != nil || server.ReadHeaderTimeout != 5*time.Second || server.MaxHeaderBytes != 32<<10 || server.WriteTimeout != 125*time.Second {
+	if e != nil || server.ReadHeaderTimeout != 5*time.Second || server.MaxHeaderBytes != 32<<10 || server.ReadTimeout != 305*time.Second || server.WriteTimeout != 305*time.Second || server.IdleTimeout != 60*time.Second {
 		t.Fatal(server, e)
 	}
 	for _, addr := range []string{"localhost:8080", "0.0.0.0:8080", "[::]:8080"} {
@@ -393,7 +393,7 @@ func TestStartupServerBoundsAndCommittedCancellation(t *testing.T) {
 	defer cancel()
 	x.h.o.Service = testadapter.Service{ExecuteFunc: func(ctx context.Context, c contract.Call) (contract.Reply, error) {
 		deadline, ok := ctx.Deadline()
-		if !ok || time.Until(deadline) > 30*time.Second {
+		if !ok || time.Until(deadline) > 300*time.Second {
 			t.Fatal("missing query timeout")
 		}
 		cancel()

@@ -30,6 +30,26 @@ const QueryLimit int64 = 8 << 20
 const ArchiveLimit int64 = 64 << 20
 const JSONLimit int64 = 64 << 20
 
+const readBudget = 30 * time.Second
+const writeBudget = 300 * time.Second
+const wireAllowance = 5 * time.Second
+
+// Both operation and wire deadlines start at request admission. A caller's
+// earlier deadline always wins, including during body consumption and writes.
+func cappedDeadline(caller context.Context, start time.Time, budget time.Duration) time.Time {
+	deadline := start.Add(budget)
+	if d, ok := caller.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
+	return deadline
+}
+
+func socketDeadlines(w http.ResponseWriter, caller context.Context, start time.Time, read, operation time.Duration) {
+	controller := http.NewResponseController(w)
+	_ = controller.SetReadDeadline(cappedDeadline(caller, start, read))
+	_ = controller.SetWriteDeadline(cappedDeadline(caller, start, operation+wireAllowance))
+}
+
 var boardID = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 var etagPattern = regexp.MustCompile(`^"rev-(0|[1-9][0-9]*)"$`)
 var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -106,7 +126,7 @@ func (h *Handler) Server(addr string) (*http.Server, error) {
 	if e != nil || n < 0 || n > 65535 || ip == nil || !ip.IsLoopback() {
 		return nil, problem("invalid_request")
 	}
-	return &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 125 * time.Second, WriteTimeout: 125 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}, nil
+	return &http.Server{Addr: addr, Handler: h, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: writeBudget + wireAllowance, WriteTimeout: writeBudget + wireAllowance, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10}, nil
 }
 func tag(r contract.Revision) string { return fmt.Sprintf(`"rev-%d"`, r) }
 func problem(code string) error {
@@ -132,7 +152,10 @@ func (w *response) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 func (h *Handler) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	caller := r.Context()
 	w := &response{ResponseWriter: writer}
+	socketDeadlines(w, caller, start, readBudget, readBudget)
 	b := make([]byte, 16)
 	if _, e := rand.Read(b); e != nil {
 		http.Error(w, "unavailable", 503)
@@ -161,19 +184,16 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
 		writeError(w, id, problem("not_found"))
 		return
 	}
-	timeout := 30 * time.Second
+	timeout := readBudget
 	if action == "export" || action == "import" {
-		timeout = 120 * time.Second
+		timeout = writeBudget
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithDeadline(caller, cappedDeadline(caller, start, timeout))
 	defer cancel()
 	r = r.WithContext(ctx)
-	// net/http's server-wide limits cap headers and idle connections. Per-route
-	// deadlines also interrupt a slow body, for which context alone is insufficient.
-	controller := http.NewResponseController(w)
-	deadline, _ := ctx.Deadline()
-	_ = controller.SetReadDeadline(deadline)
-	_ = controller.SetWriteDeadline(deadline)
+	// Query bodies retain the ordinary read bound until the operation is parsed.
+	// Import/export keep their admitted Update/Checkpoint budget through transfer.
+	socketDeadlines(w, caller, start, timeout, timeout)
 	if action == "import" || action == "export" {
 		event.Operation = action
 	}
@@ -254,7 +274,7 @@ func (h *Handler) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
 	}
 	switch action {
 	case "q":
-		h.query(w, r, id, project, principal, q, &event)
+		h.query(w, r, id, project, principal, q, &event, caller, start)
 	case "export":
 		h.export(w, r, id, project, q, &event)
 	case "import":
@@ -350,6 +370,18 @@ func body(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, error) {
 	if r.ContentLength > limit {
 		return nil, problem("payload_too_large")
 	}
+	// A context cancellation alone does not wake a blocked net/http body Read.
+	// Join an already-running callback before handing the connection back.
+	interrupted := make(chan struct{})
+	stop := context.AfterFunc(r.Context(), func() {
+		_ = http.NewResponseController(w).SetReadDeadline(time.Now())
+		close(interrupted)
+	})
+	defer func() {
+		if !stop() {
+			<-interrupted
+		}
+	}()
 	b, e := io.ReadAll(http.MaxBytesReader(w, r.Body, limit))
 	if e != nil {
 		var over *http.MaxBytesError
@@ -367,7 +399,7 @@ func body(w http.ResponseWriter, r *http.Request, limit int64) ([]byte, error) {
 func audit(h *Handler, id string, p contract.Principal, op string) contract.AuditContext {
 	return contract.AuditContext{AccountID: p.AccountID, RequestID: id, Operation: op, At: h.o.Now().UTC()}
 }
-func (h *Handler) query(w http.ResponseWriter, r *http.Request, id, project string, p contract.Principal, q url.Values, event *LogEvent) {
+func (h *Handler) query(w http.ResponseWriter, r *http.Request, id, project string, p contract.Principal, q url.Values, event *LogEvent, caller context.Context, start time.Time) {
 	if len(q) != 1 || len(q["mode"]) != 1 || q.Get("mode") != "json" || !media(r, "text/plain") {
 		writeError(w, id, problem("invalid_request"))
 		return
@@ -391,6 +423,20 @@ func (h *Handler) query(w http.ResponseWriter, r *http.Request, id, project stri
 		writeError(w, id, problem("unsupported_operation"))
 		return
 	}
+	budget := readBudget
+	if role == "editor" {
+		budget = writeBudget
+	}
+	if err := r.Context().Err(); err != nil {
+		writeError(w, id, err)
+		return
+	}
+	// Parsing a mutation admits the longer operation budget, without restarting
+	// its clock or extending the original caller's deadline.
+	ctx, cancel := context.WithDeadline(caller, cappedDeadline(caller, start, budget))
+	defer cancel()
+	r = r.WithContext(ctx)
+	socketDeadlines(w, caller, start, budget, budget)
 	event.Operation = op.Name
 	if e = h.o.Authorizer.Require(r.Context(), p, project, role); e != nil {
 		writeError(w, id, e)
