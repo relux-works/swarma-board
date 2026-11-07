@@ -62,9 +62,11 @@ func unknownCase(t *testing.T, s *session) string {
 	code(t, err, dp.NotFound)
 	equal(t, v, dp.Snapshot{})
 	cp, err := s.p.Checkpoint(s.ctx, u)
-	code(t, err, dp.NotFound)
 	if cp != nil {
 		_ = cp.Close()
+	}
+	code(t, err, dp.NotFound)
+	if cp != nil {
 		t.Fatal("reader returned on refusal")
 	}
 	calls := 0
@@ -110,12 +112,17 @@ func scopeCase(t *testing.T, s *session) string {
 			code(t, err, dp.InvalidRequest)
 			equal(t, v, dp.Snapshot{})
 			r, err := s.p.ReadResource(s.ctx, scope, abcDigest)
+			if r.Reader != nil {
+				_ = r.Reader.Close()
+			}
 			code(t, err, dp.InvalidRequest)
 			equal(t, r, dp.ResourceReader{})
 			cp, err := s.p.Checkpoint(s.ctx, scope)
-			code(t, err, dp.InvalidRequest)
 			if cp != nil {
 				_ = cp.Close()
+			}
+			code(t, err, dp.InvalidRequest)
+			if cp != nil {
 				t.Fatal("checkpoint on invalid scope")
 			}
 			calls := 0
@@ -256,6 +263,7 @@ func detachCase(t *testing.T, s *session) string {
 	view.Elements[2].Estimate.Kind = "alias"
 	s.unchanged(old)
 	cp, err := s.p.Checkpoint(s.ctx, s.scope())
+	closeOnRefusal(err, cp)
 	must(t, err)
 	defer cp.Close()
 	snap := cp.Snapshot()

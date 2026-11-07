@@ -156,6 +156,7 @@ func closeCase(t *testing.T, s *session) string {
 	s.setup()
 	s.apply(dp.ChangeSet{PutResources: []dp.ResourceInput{input("abc")}}, "drain-fixture")
 	r, err := s.p.ReadResource(s.ctx, s.scope(), abcDigest)
+	closeOnRefusal(err, r.Reader)
 	must(t, err)
 	defer r.Reader.Close()
 	closed := make(chan error, 1)
@@ -331,7 +332,9 @@ func deadlinesCase(t *testing.T, s *session) string {
 	s.apply(dp.ChangeSet{PutResources: []dp.ResourceInput{input("abc")}}, "deadline-fixture")
 	ctx, cancel := context.WithCancel(s.ctx)
 	r, err := s.p.ReadResource(ctx, s.scope(), abcDigest)
+	closeOnRefusal(err, r.Reader)
 	must(t, err)
+	defer r.Reader.Close()
 	cancel()
 	buf := make([]byte, 1)
 	_, err = r.Reader.Read(buf)
@@ -341,7 +344,9 @@ func deadlinesCase(t *testing.T, s *session) string {
 	must(t, r.Reader.Close())
 	ctx, cancel = context.WithCancel(s.ctx)
 	cp, err := s.p.Checkpoint(ctx, s.scope())
+	closeOnRefusal(err, cp)
 	must(t, err)
+	defer cp.Close()
 	snap := cp.Snapshot()
 	cancel()
 	child, err := cp.OpenResource(abcDigest)
@@ -709,10 +714,12 @@ func resourceCorruptionCase(t *testing.T, s *session) string {
 					var err error
 					if checkpoint {
 						cp, err = local.p.Checkpoint(local.ctx, local.scope())
+						closeOnRefusal(err, cp)
 						must(t, err)
 						defer cp.Close()
 					} else {
 						r, err := local.p.ReadResource(local.ctx, local.scope(), abcDigest)
+						closeOnRefusal(err, r.Reader)
 						must(t, err)
 						reader = r.Reader
 						defer reader.Close()

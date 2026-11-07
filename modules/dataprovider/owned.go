@@ -110,6 +110,7 @@ func OpenResourceReader(ctx context.Context, info ResourceInfo, backing Resource
 // the adapter, not by a fresh View/ReadResource loop. ctx MUST retain the original
 // Checkpoint admission budget, including all preparation and stream lifetime.
 func OpenCheckpoint(ctx context.Context, snapshot Snapshot, events []Event, backing ResourceBacking) (result Checkpoint, err error) {
+	admission := ctx
 	ctx, budgetCancel := BoundedContext(ctx, CheckpointTimeout)
 	owned := false
 	defer func() {
@@ -137,7 +138,10 @@ func OpenCheckpoint(ctx context.Context, snapshot Snapshot, events []Event, back
 	if err = ctx.Err(); err != nil {
 		return nil, ContextError(err)
 	}
-	cp := &ownedCheckpoint{ctx: ctx, cancel: budgetCancel, snapshot: CloneSnapshot(snapshot), events: CloneEvents(events), backing: backing, done: make(chan struct{})}
+	// Stop child operations at Close entry, but retain the admission budget
+	// through backing finalization so cleanup cannot erase its actual outcome.
+	streamCtx, streamCancel := context.WithCancel(ctx)
+	cp := &ownedCheckpoint{ctx: streamCtx, cancel: streamCancel, admission: admission, budget: ctx, budgetCancel: budgetCancel, snapshot: CloneSnapshot(snapshot), events: CloneEvents(events), backing: backing, done: make(chan struct{})}
 	go func() {
 		select {
 		case <-ctx.Done():
@@ -215,22 +219,50 @@ func (r *ownedReader) Close() error {
 }
 
 type ownedCheckpoint struct {
-	ctx      context.Context
-	cancel   context.CancelFunc
-	snapshot Snapshot
-	events   []Event
-	backing  ResourceBacking
-	mu       sync.Mutex
-	closed   bool
-	child    *ownedReader
-	failure  error
-	closeErr error
-	once     sync.Once
-	done     chan struct{}
+	ctx          context.Context
+	cancel       context.CancelFunc
+	admission    context.Context
+	budget       context.Context
+	budgetCancel context.CancelFunc
+	snapshot     Snapshot
+	events       []Event
+	backing      ResourceBacking
+	mu           sync.Mutex
+	closed       bool
+	child        *ownedReader
+	failure      error
+	closeErr     error
+	once         sync.Once
+	done         chan struct{}
+	admissionErr error
 }
 
 func (c *ownedCheckpoint) Snapshot() Snapshot { return CloneSnapshot(c.snapshot) }
 func (c *ownedCheckpoint) Events() []Event    { return CloneEvents(c.events) }
+
+// retainedContextError also works after Close, without mistaking Close's own
+// budget cancellation for an expired admission. Metadata access has no public
+// error result, so the encoder checks this private lifetime signal at writes.
+func (c *ownedCheckpoint) retainedContextError() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	select {
+	case <-c.done:
+		if c.admissionErr != nil {
+			return ContextError(c.admissionErr)
+		}
+	default:
+		// Check the original admission too: Done may close before context
+		// cancellation has propagated to the derived budget/stream contexts.
+		if err := c.admission.Err(); err != nil {
+			return ContextError(err)
+		}
+		if err := c.budget.Err(); err != nil {
+			return ContextError(err)
+		}
+	}
+	return nil
+}
 func (c *ownedCheckpoint) OpenResource(digest string) (io.ReadCloser, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -303,12 +335,17 @@ func (c *ownedCheckpoint) Close() error {
 			err = e
 		}
 		c.mu.Lock()
+		c.admissionErr = c.admission.Err()
+		if c.admissionErr == nil {
+			c.admissionErr = c.budget.Err()
+		}
 		if err == nil {
 			err = c.failure
 		}
 		c.closeErr = err
-		c.mu.Unlock()
 		close(c.done)
+		c.budgetCancel()
+		c.mu.Unlock()
 	})
 	c.mu.Lock()
 	defer c.mu.Unlock()

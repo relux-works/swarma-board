@@ -63,6 +63,7 @@ func ref(d string) dp.ResourceRef {
 func (s *session) read(scope dp.Scope, d string) []byte {
 	s.t.Helper()
 	r, err := s.p.ReadResource(s.ctx, scope, d)
+	closeOnRefusal(err, r.Reader)
 	must(s.t, err)
 	data := readAll(s.t, r.Reader)
 	equal(s.t, r.Info, info(data))
@@ -127,7 +128,9 @@ func streamCase(t *testing.T, s *session) string {
 	want.Revision = c.Revision
 	equal(t, identical.snapshot, want)
 	r, err := s.p.ReadResource(s.ctx, s.scope(), abcDigest)
+	closeOnRefusal(err, r.Reader)
 	must(t, err)
+	defer r.Reader.Close()
 	buf := make([]byte, 1)
 	n, err := r.Reader.Read(buf)
 	must(t, err)
@@ -190,12 +193,17 @@ func resourceIsolationCase(t *testing.T, s *session) string {
 	}
 	bOld := s.observe(s.boards[1].Scope)
 	r, err := s.p.ReadResource(s.ctx, s.boards[2].Scope, abcDigest)
+	if r.Reader != nil {
+		_ = r.Reader.Close()
+	}
 	code(t, err, dp.NotFound)
 	equal(t, r, dp.ResourceReader{})
 	r, err = s.p.ReadResource(s.ctx, s.scope(), abcDigest)
+	closeOnRefusal(err, r.Reader)
 	must(t, err)
 	defer r.Reader.Close()
 	cp, err := s.p.Checkpoint(s.ctx, s.scope())
+	closeOnRefusal(err, cp)
 	must(t, err)
 	defer cp.Close()
 	pinned := cp.Snapshot()
@@ -203,10 +211,14 @@ func resourceIsolationCase(t *testing.T, s *session) string {
 	equal(t, readAll(t, r.Reader), []byte("abc"))
 	equal(t, cp.Snapshot(), pinned)
 	child, err := cp.OpenResource(abcDigest)
+	closeOnRefusal(err, child)
 	must(t, err)
 	equal(t, readAll(t, child), []byte("abc"))
 	must(t, cp.Close())
 	r, err = s.p.ReadResource(s.ctx, s.scope(), abcDigest)
+	if r.Reader != nil {
+		_ = r.Reader.Close()
+	}
 	code(t, err, dp.NotFound)
 	equal(t, r, dp.ResourceReader{})
 	s.unchanged(bOld)
@@ -235,24 +247,30 @@ func checkpointCase(t *testing.T, s *session) string {
 	verifyOneShot(t, s)
 	s.refuse(dp.ChangeSet{PutResources: []dp.ResourceInput{{Info: dp.ResourceInfo{SHA256: abcDigest, Size: 3}, Reader: &errorInput{}}}}, dp.StorageError)
 	cp, err := s.p.Checkpoint(s.ctx, s.scope())
+	closeOnRefusal(err, cp)
 	must(t, err)
 	defer cp.Close()
 	before := cp.Snapshot()
 	events := cp.Events()
 	child, err := cp.OpenResource(abcDigest)
+	closeOnRefusal(err, child)
 	must(t, err)
 	second, err := cp.OpenResource(emptyDigest)
-	code(t, err, dp.InvalidRequest)
 	if second != nil {
 		_ = second.Close()
+	}
+	code(t, err, dp.InvalidRequest)
+	if second != nil {
 		t.Fatal("second active child returned")
 	}
 	must(t, child.Close())
 	must(t, child.Close())
 	absent, err := cp.OpenResource(strings.Repeat("0", 64))
-	code(t, err, dp.NotFound)
 	if absent != nil {
 		_ = absent.Close()
+	}
+	code(t, err, dp.NotFound)
+	if absent != nil {
 		t.Fatal("absent catalog member opened")
 	}
 	e := dp.CloneElement(before.Elements[2])
@@ -260,6 +278,7 @@ func checkpointCase(t *testing.T, s *session) string {
 	s.apply(dp.ChangeSet{Upserts: []dp.Element{e}, DeleteResources: []string{abcDigest, emptyDigest}}, "concurrent-delete")
 	for _, d := range []string{abcDigest, emptyDigest, abcDigest} {
 		r, err := cp.OpenResource(d)
+		closeOnRefusal(err, r)
 		must(t, err)
 		expected := []byte("abc")
 		if d == emptyDigest {
@@ -270,6 +289,7 @@ func checkpointCase(t *testing.T, s *session) string {
 	equal(t, cp.Snapshot(), before)
 	equal(t, cp.Events(), events)
 	child, err = cp.OpenResource(abcDigest)
+	closeOnRefusal(err, child)
 	must(t, err)
 	must(t, cp.Close())
 	must(t, cp.Close())
@@ -278,9 +298,11 @@ func checkpointCase(t *testing.T, s *session) string {
 	code(t, err, dp.Unavailable)
 	must(t, child.Close())
 	closed, err := cp.OpenResource(abcDigest)
-	code(t, err, dp.Unavailable)
 	if closed != nil {
 		_ = closed.Close()
+	}
+	code(t, err, dp.Unavailable)
+	if closed != nil {
 		t.Fatal("closed checkpoint opened resource")
 	}
 	equal(t, cp.Snapshot(), before)

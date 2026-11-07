@@ -417,7 +417,9 @@ func historyCase(t *testing.T, s *session) string {
 		}()
 		check := func() {
 			cp, err := local.p.Checkpoint(local.ctx, local.scope())
+			closeOnRefusal(err, cp)
 			must(t, err)
+			defer cp.Close()
 			snap := cp.Snapshot()
 			events := cp.Events()
 			_, err = dp.EncodeCheckpoint(local.ctx, io.Discard, cp)
@@ -474,9 +476,11 @@ func historyCase(t *testing.T, s *session) string {
 			local.p = p
 			local.provision = pr
 			cp, err := p.Checkpoint(local.ctx, local.scope())
-			code(t, err, dp.StorageError)
 			if cp != nil {
 				_ = cp.Close()
+			}
+			code(t, err, dp.StorageError)
+			if cp != nil {
 				t.Fatal("corrupted stream returned a checkpoint")
 			}
 		})

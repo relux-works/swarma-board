@@ -68,7 +68,10 @@ func CopyResource(ctx context.Context, dst io.Writer, in ResourceInput) (int64, 
 		}
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
-				return count, streamError(err)
+				// A source read cannot establish a publication outcome or a
+				// membership refusal. Preserve only context sentinels here;
+				// destination errors above retain their encoder/budget codes.
+				return count, committedError(err)
 			}
 			if count != in.Info.Size || hex.EncodeToString(h.Sum(nil)) != in.Info.SHA256 {
 				return count, NewError(InvalidSnapshot)

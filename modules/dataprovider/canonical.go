@@ -13,14 +13,25 @@ import (
 // budgetWriter refuses an overflowing chunk before writing it. Any failed
 // encoding is incomplete and must be discarded, never published as success.
 type budgetWriter struct {
-	w      io.Writer
-	n, cap int64
-	ctx    context.Context
+	w                    io.Writer
+	n, cap               int64
+	ctx                  context.Context
+	retainedContextError func() error
+}
+
+func (w *budgetWriter) contextError() error {
+	if w.ctx != nil && w.ctx.Err() != nil {
+		return ContextError(w.ctx.Err())
+	}
+	if w.retainedContextError != nil {
+		return w.retainedContextError()
+	}
+	return nil
 }
 
 func (w *budgetWriter) Write(p []byte) (int, error) {
-	if w.ctx != nil && w.ctx.Err() != nil {
-		return 0, ContextError(w.ctx.Err())
+	if err := w.contextError(); err != nil {
+		return 0, err
 	}
 	if int64(len(p)) > w.cap-w.n {
 		return 0, NewError(PayloadTooLarge)
@@ -33,8 +44,8 @@ func (w *budgetWriter) Write(p []byte) (int, error) {
 	if n != len(p) {
 		return n, NewError(StorageError)
 	}
-	if w.ctx != nil && w.ctx.Err() != nil {
-		return n, ContextError(w.ctx.Err())
+	if err := w.contextError(); err != nil {
+		return n, err
 	}
 	return n, nil
 }
@@ -321,16 +332,20 @@ func EncodeCheckpoint(ctx context.Context, w io.Writer, cp Checkpoint) (n int64,
 	if cp == nil {
 		return 0, NewError(InvalidRequest)
 	}
+	b := &budgetWriter{w: w, cap: MaxCheckpointBytes, ctx: ctx}
+	if retained, ok := cp.(interface{ retainedContextError() error }); ok {
+		b.retainedContextError = retained.retainedContextError
+	}
 	defer func() {
 		if ce := cp.Close(); err == nil && ce != nil {
 			err = streamError(ce)
 		}
-		if err == nil && ctx.Err() != nil {
-			err = ContextError(ctx.Err())
+		if err == nil {
+			err = b.contextError()
 		}
 	}()
-	if err = ctx.Err(); err != nil {
-		return 0, ContextError(err)
+	if err = b.contextError(); err != nil {
+		return 0, err
 	}
 	s := cp.Snapshot()
 	events := cp.Events()
@@ -340,7 +355,6 @@ func EncodeCheckpoint(ctx context.Context, w io.Writer, cp Checkpoint) (n int64,
 	if err = ValidateEvents(s, events); err != nil {
 		return 0, err
 	}
-	b := &budgetWriter{w: w, cap: MaxCheckpointBytes, ctx: ctx}
 	defer func() { n = b.n }()
 	if err = literal(b, `{"snapshot":`); err != nil {
 		return

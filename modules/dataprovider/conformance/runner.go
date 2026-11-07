@@ -234,6 +234,14 @@ func code(t *testing.T, err error, want dp.Code) {
 }
 func zeroCommit(t *testing.T, c dp.Commit) { t.Helper(); equal(t, c, dp.Commit{}) }
 
+// Refusal ownership must be released before an assertion can stop the caller.
+// Successful handles keep their ordinary consumption and lifetime checks.
+func closeOnRefusal(err error, handle io.Closer) {
+	if err != nil && handle != nil {
+		_ = handle.Close()
+	}
+}
+
 type observation struct {
 	snapshot dp.Snapshot
 	events   []dp.Event
@@ -244,10 +252,12 @@ type observation struct {
 func (s *session) observe(scope dp.Scope) observation {
 	s.t.Helper()
 	cp, err := s.p.Checkpoint(s.ctx, scope)
+	closeOnRefusal(err, cp)
 	must(s.t, err)
 	if cp == nil {
 		s.t.Fatal("successful checkpoint is nil")
 	}
+	defer cp.Close()
 	o := observation{snapshot: cp.Snapshot(), events: cp.Events()}
 	h := sha256.New()
 	o.bytes, err = dp.EncodeCheckpoint(s.ctx, h, cp)
