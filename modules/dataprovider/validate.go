@@ -152,9 +152,16 @@ func ValidateRecordShape(e Element) error {
 	if !elementID.MatchString(e.ID) || !strings.HasPrefix(e.ID, strings.ToUpper(e.Type)+"-") || !slices.Contains([]string{"epic", "story", "task", "bug"}, e.Type) || strings.TrimSpace(e.Name) == "" || !slices.Contains([]string{"backlog", "analysis", "to-dev", "development", "to-review", "reviewing", "integrating", "done", "closed", "blocked"}, e.Status) {
 		return NewError(InvalidSnapshot)
 	}
-	for _, s := range []string{e.Name, e.Title, e.Description, e.Scope, e.AcceptanceCriteria, e.AssignedTo, e.Notes, e.ParentID} {
+	for _, s := range []string{e.ID, e.Type, e.Name, e.Title, e.Description, e.Scope, e.Status, e.AcceptanceCriteria, e.AssignedTo, e.Notes, e.ParentID, e.Review, e.TaskClass} {
 		if !utf8.ValidString(s) {
 			return NewError(InvalidSnapshot)
+		}
+	}
+	for _, edges := range [][]string{e.BlockedBy, e.ManualBlockedBy} {
+		for _, id := range edges {
+			if !utf8.ValidString(id) {
+				return NewError(InvalidSnapshot)
+			}
 		}
 	}
 	if e.Review != "" && !slices.Contains([]string{"required", "light", "none"}, e.Review) || e.TaskClass != "" && !slices.Contains([]string{"code", "metadata", "docs", "research"}, e.TaskClass) {
@@ -190,7 +197,7 @@ func ValidateRecordShape(e Element) error {
 		}
 	}
 	for _, r := range e.ResourceRefs {
-		if !utf8.ValidString(r.Name+r.URI+r.Description) || r.Type != "precondition" && r.Type != "outcome" {
+		if !utf8.ValidString(r.Name) || !utf8.ValidString(r.URI) || !utf8.ValidString(r.Description) || !utf8.ValidString(r.Type) || r.Type != "precondition" && r.Type != "outcome" {
 			return NewError(InvalidSnapshot)
 		}
 		_, reserved, err := ResourceDigest(r.URI)
@@ -261,10 +268,13 @@ func ValidateChangeSet(c ChangeSet) error {
 // graph semantics remain the shared domain's responsibility. Catalog/record
 // ordering is checked rather than silently repaired by the parity encoder.
 func ValidateSnapshot(s Snapshot) error {
+	if err := preflightJSON(s, MaxSnapshotBytes); err != nil {
+		return err
+	}
 	if err := ValidateScope(s.Board.Scope); err != nil {
 		return NewError(InvalidSnapshot)
 	}
-	if s.Revision.Scope != s.Board.Scope || !utf8.ValidString(s.Board.Name+s.Board.Description) || len(s.Elements) > MaxElements || len(s.Resources) > MaxResourceCount {
+	if s.Revision.Scope != s.Board.Scope || !utf8.ValidString(s.Board.Name) || !utf8.ValidString(s.Board.Description) || len(s.Elements) > MaxElements || len(s.Resources) > MaxResourceCount {
 		return NewError(InvalidSnapshot)
 	}
 	if err := ValidateProvenance(s.Provenance); err != nil {

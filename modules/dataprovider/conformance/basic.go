@@ -405,8 +405,8 @@ func orderingCase(t *testing.T, s *session) string {
 	s.setup()
 	e := dp.CloneElement(s.seed[2])
 	e.Checklist = []dp.ChecklistItem{{Text: "z"}, {Text: "a", Checked: true}}
-	e.BlockedBy = nil
-	e.ManualBlockedBy = []string{}
+	e.BlockedBy = []string{"TASK-3", "TASK-2"}
+	e.ManualBlockedBy = []string{"TASK-3", "TASK-2"}
 	e.ResourceRefs = []dp.ResourceRef{{Name: "z", URI: "urn:example:z", Type: "outcome"}, {Name: "a", URI: "https://example.invalid/a", Type: "precondition"}}
 	at := s.actor.At
 	e.CreatedAt = &at
@@ -416,13 +416,26 @@ func orderingCase(t *testing.T, s *session) string {
 	bug.Name = "bug"
 	bug.Estimate = nil
 	bug.CreatedAt = nil
+	bug.BlockedBy = nil
+	bug.ManualBlockedBy = []string{}
+	second, third := dp.CloneElement(s.seed[2]), dp.CloneElement(s.seed[2])
+	second.ID, third.ID = "TASK-2", "TASK-3"
+	story := dp.CloneElement(s.seed[1])
+	otherStory := dp.CloneElement(story)
+	otherStory.ID = "STORY-2"
+	thirdStory := dp.CloneElement(story)
+	thirdStory.ID = "STORY-3"
+	story.BlockedBy = []string{"STORY-3", "STORY-2"}
+	story.ManualBlockedBy = []string{"STORY-3", "STORY-2"}
 	c, err := s.p.Update(s.ctx, s.scope(), s.rev(1), s.actor, func(dp.Snapshot) (dp.ChangeSet, error) {
-		return dp.ChangeSet{Upserts: []dp.Element{e, bug}, Provenance: []dp.ProvenanceFile{provenance("z", "z"), provenance("a", "a")}}, nil
+		// Keep the oracle detached from callback-owned arrays: an adapter
+		// mutating its input must not mutate the expected nested order too.
+		return dp.ChangeSet{Upserts: cloneSeed([]dp.Element{third, e, thirdStory, otherStory, bug, second, story}), Provenance: []dp.ProvenanceFile{provenance("z", "z"), provenance("a", "a")}}, nil
 	})
 	must(t, err)
-	equal(t, c.ChangedIDs, []string{"BUG-2", "TASK-1"})
+	equal(t, c.ChangedIDs, []string{"BUG-2", "STORY-1", "STORY-2", "STORY-3", "TASK-1", "TASK-2", "TASK-3"})
 	now := s.observe(s.scope())
-	equal(t, now.snapshot.Elements, []dp.Element{bug, s.seed[0], s.seed[1], e})
+	equal(t, now.snapshot.Elements, []dp.Element{bug, s.seed[0], story, otherStory, thirdStory, e, second, third})
 	equal(t, now.snapshot.Provenance, []dp.ProvenanceFile{provenance("a", "a"), provenance("z", "z")})
 	s.reopen()
 	s.unchanged(now)

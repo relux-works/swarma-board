@@ -169,6 +169,7 @@ func concurrentFaultCase(t *testing.T, s *session) string {
 			defer cancel()
 			v, err := local.p.View(ctx, local.scope())
 			if err != nil {
+				equal(t, v, dp.Snapshot{})
 				if local.name != "filesystem" {
 					t.Fatal(err)
 				}
@@ -186,16 +187,20 @@ func concurrentFaultCase(t *testing.T, s *session) string {
 			checkpointStarted := time.Now()
 			cp, err := local.p.Checkpoint(ctx, local.scope())
 			if err != nil {
+				if cp != nil {
+					_ = cp.Close()
+					t.Fatal("handle on refusal")
+				}
 				if local.name != "filesystem" {
 					t.Fatal(err)
 				}
 				code(t, err, dp.Unavailable)
 				lockElapsed(t, checkpointStarted)
-				if cp != nil {
-					_ = cp.Close()
-					t.Fatal("handle on refusal")
-				}
 			} else {
+				if cp == nil {
+					t.Fatal("missing successful checkpoint")
+				}
+				t.Cleanup(func() { must(t, cp.Close()) })
 				snap := cp.Snapshot()
 				if p.Stage == BeforeDecision && !dp.EqualCanonicalSnapshot(snap, old.snapshot) {
 					_ = cp.Close()
@@ -219,6 +224,12 @@ func concurrentFaultCase(t *testing.T, s *session) string {
 					t.Fatal("uncommitted resource visible")
 				}
 			} else {
+				// Close unexpected ownership before any assertion can terminate
+				// the subtest; provider shutdown may wait for this lease.
+				if rr.Reader != nil {
+					_ = rr.Reader.Close()
+				}
+				equal(t, rr, dp.ResourceReader{})
 				c, ok := dp.CodeOf(err)
 				if !ok || c != dp.NotFound && (local.name != "filesystem" || c != dp.Unavailable) {
 					t.Fatal(err)
@@ -261,9 +272,12 @@ func preDecisionCase(t *testing.T, s *session) string {
 			must(t, ticket.WaitReached(local.ctx))
 			trigger(t, local, ticket, p, DefiniteFailure)
 			r := awaitUpdate(t, local, done)
-			if r.err == nil {
-				t.Fatal("faulted pre-decision write succeeded")
+			// The injected pre-decision storage failure has a definite old
+			// outcome. Ambiguity belongs exclusively to C16.
+			if _, ok := r.err.(*dp.Error); !ok {
+				t.Fatalf("pre-decision failure requires a closed storage_error, got %T", r.err)
 			}
+			code(t, r.err, dp.StorageError)
 			zeroCommit(t, r.c)
 			local.unchanged(old)
 			local.reopen()

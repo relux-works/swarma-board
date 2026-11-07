@@ -51,6 +51,12 @@ fixed-revision catalog, verifies each streamed payload, closes each child and
 the checkpoint on every path, and propagates late read/close failures. Failed
 output is incomplete and must be discarded. Metadata can use the existing
 bounded in-memory values; no payload-sized return buffer is introduced.
+Snapshot validation and encoding charge a metadata byte lower bound before
+whole-value JSON allocation; exact compact encoding still enforces the same cap.
+Every serialized text field is checked independently for UTF-8. Checkpoint output
+checks cancellation at every Write boundary and after final Close, including
+resource-free and history-only streams. An uncooperative blocked Writer cannot
+be interrupted by these checks.
 
 `OpenResourceReader` and `OpenCheckpoint` implement the common owned-handle
 lifecycle over adapter-pinned immutable `ResourceBacking`: complete pre-exposure
@@ -81,6 +87,10 @@ mechanisms, partial scenarios and later integration/qualification remain
 acceptance result. `Report.RequireAll(t)` gates complete acceptance;
 `conformance.Compare(t, filesystemReport, databaseReport)` requires two complete
 reports with identical frozen digests and compares canonical modeled outcomes.
+All three report gates require the exact frozen ordered case IDs and layers.
+Verified provider rows must include valid canonical observations for each fixture
+Scope; observations from independent subcases are retained as an ordered union.
+Duplicate/missing rows, malformed observations and incomplete results refuse.
 The complete checkpoint digest includes Scope, every record/null/array, revision,
 Actor, ordered events, membership and payload bytes. The only allowed availability
 difference is measured FS active-write bounded-lock refusal; all successful reads

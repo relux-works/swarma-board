@@ -51,19 +51,7 @@ func Run(t *testing.T, factory Factory, faults FaultDriver) Report {
 			s := newSession(t, factory, faults)
 			r.Detail = fn(t, s)
 			r.Faults = append(r.Faults, s.receipts...)
-			for _, o := range s.observations {
-				r.Observations = append(r.Observations, o)
-			}
-			sort.Slice(r.Observations, func(i, j int) bool {
-				a, b := r.Observations[i], r.Observations[j]
-				if a.Scope.ProductID != b.Scope.ProductID {
-					return a.Scope.ProductID < b.Scope.ProductID
-				}
-				if a.Scope.BoardID != b.Scope.BoardID {
-					return a.Scope.BoardID < b.Scope.BoardID
-				}
-				return a.Revision.Counter < b.Revision.Counter
-			})
+			r.Observations = s.canonicalObservations()
 			if r.Detail == "" {
 				r.Status = Verified
 			} else {
@@ -83,13 +71,8 @@ func Run(t *testing.T, factory Factory, faults FaultDriver) Report {
 // and unmeasured native/workload qualification cannot silently pass it.
 func (r Report) RequireAll(t *testing.T) {
 	t.Helper()
-	for _, c := range r.Results {
-		if c.Status != Verified {
-			t.Errorf("%s %s: %s", c.ID, c.Status, c.Detail)
-		}
-	}
-	if len(r.Results) != 50 {
-		t.Error("incomplete fifty-case report")
+	if err := r.verificationError(); err != nil {
+		t.Error(err)
 	}
 }
 
@@ -105,6 +88,7 @@ type session struct {
 	faults              FaultDriver
 	receipts            []FaultReceipt
 	parent              *session
+	children            []*session
 	observations        map[string]CanonicalObservation
 	resourceReplacement bool
 	boards              []dp.Board
@@ -163,8 +147,32 @@ func (s *session) scope() dp.Scope { return s.boards[0].Scope }
 func (s *session) fresh(t *testing.T) *session {
 	child := newSession(t, s.factory, s.faults)
 	child.parent = s
+	s.children = append(s.children, child)
 	child.resourceReplacement = s.resourceReplacement
 	return child
+}
+
+// Subcases have independent roots and may legitimately produce different
+// values at the same Scope/revision. Retain the complete union, ordered by
+// Scope/revision/digest/bytes; only identical observations are deduplicated.
+func (s *session) canonicalObservations() []CanonicalObservation {
+	seen := map[CanonicalObservation]bool{}
+	var visit func(*session)
+	visit = func(current *session) {
+		for _, o := range current.observations {
+			seen[o] = true
+		}
+		for _, child := range current.children {
+			visit(child)
+		}
+	}
+	visit(s)
+	var out []CanonicalObservation
+	for o := range seen {
+		out = append(out, o)
+	}
+	sort.Slice(out, func(i, j int) bool { return observationLess(out[i], out[j]) })
+	return out
 }
 func (s *session) rev(n uint64) dp.Revision { return dp.Revision{Scope: s.scope(), Counter: n} }
 func (s *session) setup() {

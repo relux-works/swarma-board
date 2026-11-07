@@ -13,24 +13,14 @@ func Compare(t *testing.T, filesystem, database Report) {
 		t.Error("comparison requires both real adapter reports")
 		return
 	}
-	if filesystem.SpecSHA256 != SpecSHA256 || database.SpecSHA256 != SpecSHA256 || filesystem.VectorsSHA256 != VectorsSHA256 || database.VectorsSHA256 != VectorsSHA256 {
-		t.Error("comparison requires identical frozen spec/vectors")
-		return
-	}
-	if len(filesystem.Results) != 50 || len(database.Results) != 50 {
-		t.Error("comparison requires fifty results per factory")
-		return
+	for _, r := range []Report{filesystem, database} {
+		if err := r.verificationError(); err != nil {
+			t.Errorf("%s: %v", r.Provider, err)
+			return
+		}
 	}
 	for i, a := range filesystem.Results {
 		b := database.Results[i]
-		if a.ID != b.ID {
-			t.Error("case ordering differs")
-			continue
-		}
-		if a.Status != Verified || b.Status != Verified {
-			t.Errorf("%s parity NOT_VERIFIED: FS=%s DB=%s", a.ID, a.Status, b.Status)
-			continue
-		}
 		equal(t, a.Observations, b.Observations)
 	}
 }

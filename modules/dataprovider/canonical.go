@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
+	"reflect"
 	"slices"
+	"strings"
 )
 
 // budgetWriter refuses an overflowing chunk before writing it. Any failed
@@ -13,9 +15,13 @@ import (
 type budgetWriter struct {
 	w      io.Writer
 	n, cap int64
+	ctx    context.Context
 }
 
 func (w *budgetWriter) Write(p []byte) (int, error) {
+	if w.ctx != nil && w.ctx.Err() != nil {
+		return 0, ContextError(w.ctx.Err())
+	}
 	if int64(len(p)) > w.cap-w.n {
 		return 0, NewError(PayloadTooLarge)
 	}
@@ -27,7 +33,80 @@ func (w *budgetWriter) Write(p []byte) (int, error) {
 	if n != len(p) {
 		return n, NewError(StorageError)
 	}
+	if w.ctx != nil && w.ctx.Err() != nil {
+		return n, ContextError(w.ctx.Err())
+	}
 	return n, nil
+}
+
+// preflightJSON charges a lower bound before json.Marshal can allocate a whole
+// metadata value. It is used only with this module's fixed record declarations:
+// strings cost at least their input bytes, byte slices at least their raw bytes,
+// and arrays/records/scalars at least their structural minimum. Escaping,
+// base64 expansion and field names can only add bytes; budgetWriter still
+// enforces the exact compact encoding cap. No input-sized buffer is built here.
+func preflightJSON(v any, remaining int64) error {
+	charge := func(n int64) bool {
+		if n > remaining {
+			return false
+		}
+		remaining -= n
+		return true
+	}
+	var visit func(reflect.Value) bool
+	visit = func(v reflect.Value) bool {
+		if !v.IsValid() {
+			return charge(1)
+		}
+		switch v.Kind() {
+		case reflect.Pointer, reflect.Interface:
+			if v.IsNil() {
+				return charge(1)
+			}
+			return visit(v.Elem())
+		case reflect.String:
+			return charge(max(1, int64(v.Len())))
+		case reflect.Slice, reflect.Array:
+			if v.Type().Elem().Kind() == reflect.Uint8 {
+				return charge(max(1, int64(v.Len())))
+			}
+			// Brackets and separators alone cost len+1, including []'s
+			// normalized form for nil top-level collections.
+			if !charge(1) || !charge(int64(v.Len())) {
+				return false
+			}
+			for i := 0; i < v.Len(); i++ {
+				if !visit(v.Index(i)) {
+					return false
+				}
+			}
+			return true
+		case reflect.Struct:
+			if !charge(1) {
+				return false
+			}
+			for i := 0; i < v.NumField(); i++ {
+				field := v.Type().Field(i)
+				if field.PkgPath != "" || field.Tag.Get("json") == "-" {
+					continue
+				}
+				x := v.Field(i)
+				if strings.Contains(field.Tag.Get("json"), ",omitempty") && x.IsZero() {
+					continue
+				}
+				if !visit(x) {
+					return false
+				}
+			}
+			return true
+		default:
+			return charge(1)
+		}
+	}
+	if !visit(reflect.ValueOf(v)) {
+		return NewError(PayloadTooLarge)
+	}
+	return nil
 }
 func array[T any](v []T) []T {
 	if v == nil {
@@ -59,6 +138,11 @@ func eventValue(e Event) Event {
 	return e
 }
 func writeJSON(w io.Writer, v any) error {
+	if b, ok := w.(*budgetWriter); ok {
+		if err := preflightJSON(v, b.cap-b.n); err != nil {
+			return err
+		}
+	}
 	p, err := json.Marshal(v)
 	if err != nil {
 		return NewError(InvalidSnapshot)
@@ -68,6 +152,9 @@ func writeJSON(w io.Writer, v any) error {
 }
 func literal(w io.Writer, s string) error { _, err := io.WriteString(w, s); return err }
 func EncodeSnapshot(w io.Writer, s Snapshot) (int64, error) {
+	if err := preflightJSON(s, MaxSnapshotBytes); err != nil {
+		return 0, err
+	}
 	b := &budgetWriter{w: w, cap: MaxSnapshotBytes}
 	err := writeJSON(b, snapshotValue(s))
 	return b.n, err
@@ -162,7 +249,7 @@ func EncodeChangeSet(ctx context.Context, w io.Writer, c ChangeSet, open StagedR
 	if err := ctx.Err(); err != nil {
 		return 0, ContextError(err)
 	}
-	b := &budgetWriter{w: w, cap: MaxChangeSetBytes}
+	b := &budgetWriter{w: w, cap: MaxChangeSetBytes, ctx: ctx}
 	err := encodeChangeSet(ctx, b, c, open)
 	return b.n, err
 }
@@ -238,19 +325,22 @@ func EncodeCheckpoint(ctx context.Context, w io.Writer, cp Checkpoint) (n int64,
 		if ce := cp.Close(); err == nil && ce != nil {
 			err = streamError(ce)
 		}
+		if err == nil && ctx.Err() != nil {
+			err = ContextError(ctx.Err())
+		}
 	}()
-	s := cp.Snapshot()
-	events := cp.Events()
 	if err = ctx.Err(); err != nil {
 		return 0, ContextError(err)
 	}
+	s := cp.Snapshot()
+	events := cp.Events()
 	if err = ValidateSnapshot(s); err != nil {
 		return 0, err
 	}
 	if err = ValidateEvents(s, events); err != nil {
 		return 0, err
 	}
-	b := &budgetWriter{w: w, cap: MaxCheckpointBytes}
+	b := &budgetWriter{w: w, cap: MaxCheckpointBytes, ctx: ctx}
 	defer func() { n = b.n }()
 	if err = literal(b, `{"snapshot":`); err != nil {
 		return
@@ -308,6 +398,9 @@ func EncodeCheckpoint(ctx context.Context, w io.Writer, cp Checkpoint) (n int64,
 // EqualCanonicalSnapshot compares modeled values, including nested null/empty
 // distinctions, without changing the provider's required ordering.
 func EqualCanonicalSnapshot(a, b Snapshot) bool {
+	if preflightJSON(a, MaxSnapshotBytes) != nil || preflightJSON(b, MaxSnapshotBytes) != nil {
+		return false
+	}
 	x, xe := json.Marshal(snapshotValue(a))
 	y, ye := json.Marshal(snapshotValue(b))
 	return xe == nil && ye == nil && slices.Equal(x, y)

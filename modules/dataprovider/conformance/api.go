@@ -167,13 +167,5 @@ type Report struct {
 }
 
 func (r Report) AllVerified() bool {
-	if len(r.Results) != 50 {
-		return false
-	}
-	for _, c := range r.Results {
-		if c.Status != Verified {
-			return false
-		}
-	}
-	return true
+	return r.verificationError() == nil
 }
