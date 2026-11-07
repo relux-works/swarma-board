@@ -79,3 +79,10 @@ Operation contexts bound cooperative work; blocking engine/OS I/O is not forcibl
 interruptible and requires storage/deadline qualification. This draft does not
 install a provider or admit a runtime deployment. Independent exact-head review
 and source-owner composition remain required.
+
+The current shared harness is awaiting corrections from independent review.
+Its raw statuses are provisional behavioral observations, not accepted complete
+conformance. Requalification against the corrected, reviewed common dependency
+is required before shared composition or any acceptance claim. The controller
+can retain bounded synthetic physical database copies and a hash/time manifest
+through its test-only evidence destination, separately from provider APIs.

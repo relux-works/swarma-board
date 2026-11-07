@@ -3,10 +3,15 @@ package providerdb
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -16,8 +21,11 @@ import (
 )
 
 type physicalDriver struct {
-	mu      sync.Mutex
-	tickets map[string]*physicalTicket
+	evidenceSeq   atomic.Uint64
+	evidenceMu    sync.Mutex
+	evidenceBytes int64
+	mu            sync.Mutex
+	tickets       map[string]*physicalTicket
 }
 type physicalTicket struct {
 	driver       *physicalDriver
@@ -114,6 +122,10 @@ func (t *physicalTicket) Trigger(ctx context.Context) (cf.FaultReceipt, error) {
 	}
 	t.used = true
 	t.receipt.TriggeredAt = time.Now().UTC()
+	if e := t.driver.capture(t.root, t.point.ID+"-"+string(t.mode)); e != nil {
+		return cf.FaultReceipt{}, e
+	}
+
 	if t.mode == cf.Kill {
 		exit := t.process.kill()
 		t.receipt.ProcessExit = &exit
@@ -339,4 +351,80 @@ func (d *physicalDriver) InstallHistory(ctx context.Context, root string, fixtur
 		}
 		return persist(b, fixture.Snapshot, nil)
 	})
+}
+
+// capture retains actual stopped/paused synthetic files before test cleanup.
+// It has a separate small cap and never follows a source symlink. Test-only
+// evidence paths are supplied by the isolated controller, not a provider API.
+func (d *physicalDriver) capture(root, label string) error {
+	destination := os.Getenv("PROVIDERDB_EVIDENCE")
+	if destination == "" {
+		return nil
+	}
+	if !filepath.IsAbs(destination) {
+		return dp.NewError(dp.InvalidRequest)
+	}
+	if e := os.MkdirAll(destination, 0700); e != nil {
+		return e
+	}
+	st, e := os.Lstat(destination)
+	if e != nil || !st.IsDir() || st.Mode().Perm() != 0700 {
+		return dp.NewError(dp.Unavailable)
+	}
+	path := filepath.Join(root, "provider.db")
+	st, e = os.Lstat(path)
+	if e != nil {
+		return e
+	}
+	if !st.Mode().IsRegular() {
+		return nil
+	}
+	if st.Size() > 2<<20 {
+		return dp.NewError(dp.PayloadTooLarge)
+	}
+	d.evidenceMu.Lock()
+	defer d.evidenceMu.Unlock()
+	if st.Size() > 16<<20-d.evidenceBytes {
+		return dp.NewError(dp.PayloadTooLarge)
+	}
+	id := d.evidenceSeq.Add(1)
+	in, e := os.Open(path)
+	if e != nil {
+		return e
+	}
+	defer in.Close()
+	out, e := os.OpenFile(filepath.Join(destination, fmt.Sprintf("%04d-%s.db", id, label)), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if e != nil {
+		return e
+	}
+	h := sha256.New()
+	n, e := io.Copy(io.MultiWriter(out, h), io.LimitReader(in, (2<<20)+1))
+	ce := out.Close()
+	if e == nil {
+		e = ce
+	}
+	if e != nil {
+		return e
+	}
+	if n != st.Size() {
+		return dp.NewError(dp.StorageError)
+	}
+	d.evidenceBytes += n
+	entry := struct {
+		File       string    `json:"file"`
+		Label      string    `json:"label"`
+		SHA256     string    `json:"sha256"`
+		Bytes      int64     `json:"bytes"`
+		CapturedAt time.Time `json:"captured_at"`
+	}{fmt.Sprintf("%04d-%s.db", id, label), label, hex.EncodeToString(h.Sum(nil)), n, time.Now().UTC()}
+	manifest, e := os.OpenFile(filepath.Join(destination, "manifest.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if e != nil {
+		return e
+	}
+	e = json.NewEncoder(manifest).Encode(entry)
+	ce = manifest.Close()
+	if e == nil {
+		e = ce
+	}
+	return e
 }
