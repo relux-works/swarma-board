@@ -15,3 +15,7 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	golang.org/x/sys v0.38.0
 )
+
+require github.com/relux-works/swarma-board/dataprovider v0.1.0
+
+replace github.com/relux-works/swarma-board/dataprovider => ./modules/dataprovider
