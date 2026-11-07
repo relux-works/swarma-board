@@ -22,7 +22,7 @@ import (
 	dp "github.com/relux-works/swarma-board/dataprovider"
 )
 
-const schemaBytes = `{"format":"scoped-filesystem","version":1}`
+const schemaBytes = `{"format":"scoped-filesystem","version":2,"projection":"id-rank-pairs/1"}`
 
 var generationName = regexp.MustCompile(`^gen-[a-f0-9]{32}$`)
 var transactionName = regexp.MustCompile(`^[a-f0-9]{32}\.json$`)
@@ -32,9 +32,10 @@ type pointer struct {
 	SHA256     string `json:"sha256"`
 }
 type envelope struct {
-	Scope          dp.Scope `json:"scope"`
-	SnapshotSHA256 string   `json:"snapshot_sha256"`
-	EventsSHA256   string   `json:"events_sha256"`
+	Scope            dp.Scope `json:"scope"`
+	SnapshotSHA256   string   `json:"snapshot_sha256"`
+	EventsSHA256     string   `json:"events_sha256"`
+	ProjectionSHA256 string   `json:"projection_sha256"`
 }
 type diskState struct {
 	Snapshot dp.Snapshot
@@ -268,6 +269,9 @@ func (p *Provider) loadAtPointer(ctx context.Context, s dp.Scope, dir string, ve
 	if out.Snapshot.Board != board || dp.ValidateSnapshot(out.Snapshot) != nil {
 		return out, fail(dp.StorageError)
 	}
+	if err := p.verifyProjection(ctx, out.Dir, out.Snapshot, env); err != nil {
+		return out, err
+	}
 	f, err := p.safeFile(out.Dir + "/events.ndjson")
 	if err != nil {
 		return out, err
@@ -310,7 +314,7 @@ func (p *Provider) loadAtPointer(ctx context.Context, s dp.Scope, dir string, ve
 		names = append(names, e.Name())
 	}
 	slices.Sort(names)
-	if !slices.Equal(names, []string{"envelope.json", "events.ndjson", "resources", "snapshot.json"}) {
+	if !slices.Equal(names, []string{"elements", "envelope.json", "events.ndjson", "projection.json", "resources", "snapshot.json"}) {
 		return out, fail(dp.StorageError)
 	}
 	if err := p.checkDir(out.Dir + "/resources"); err != nil {

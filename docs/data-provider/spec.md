@@ -530,33 +530,78 @@ difference is excluded from cross-provider parity (C13/C45). After the writer
 finishes, quiescent reads and their semantic errors must match exactly. A latched
 recovery barrier still refuses reads until coherent recovery and is tested as
 such; it is not an extra general parity exclusion. No torn read is ever allowed.
-Existing filesystem behavior and source bytes remain unchanged by this spec.
-The new strict FS provider opens **only trees created by its EnsureEmpty** with
-recognized provider schema, full Scope metadata and complete coherent envelope.
-Legacy trees remain with old task-board; missing schema, unknown sections that
-cannot be represented losslessly, and missing README pairs refuse, not repair.
-For new trees the adapter must preserve its supported markdown, paths,
-field/array behavior and recovery guarantees; unknown source text must never be
-silently dropped. No existing board is opened or rewritten here. Strict
-server reads must not silently omit unreadable facts. Execution/CR-derived
-authority hooks are outside this provider protocol; existing upstream behavior
-is not changed by that boundary. If faithful adaptation exposes an incompatibility,
-report its exact source seam for protocol review; do not introduce a conversion
-project, sanitizer or migration prerequisite. The target for later owner scripts
-is a provider-created compatible tree with recognized schema, scoped metadata,
-complete representable facts, integrity and recovery envelope; this is an
-openability target only, not a migration design, loader or permission. The
-supported later-script route for domain-valid native-v2 state is EnsureEmpty
-followed by explicit same-scope, matching-Board, empty-target import under P3;
-it creates the recognized envelope through the provider, never by editing files.
-It does not admit legacy/no-schema trees or relax scope/format refusals.
+Existing native/legacy filesystem behavior and upstream source bytes remain
+unchanged. The following accepted NEW-tree mapping replaces literal native path
+and Markdown round-trip fidelity only in the strict provider's private on-disk layout.
+The strict FS provider opens only NEW trees created by its EnsureEmpty with
+recognized provider-local schema, complete full Scope metadata and a coherent
+commit envelope. The fresh-tree schema is
+`{"format":"scoped-filesystem","version":2,"projection":"id-rank-pairs/1"}`.
+No in-place upgrade, legacy reader, progress reader or migration is introduced.
 
-Renaming/reparenting a container changes physical paths for its entire descendant
-subtree even when descendant Element values/ChangedIDs are unchanged. One commit
-envelope must cover every affected path plus facts, resource membership, revision
-and event. The shared fault suite covers this explicitly; a DB's simpler key
-update must not weaken the FS oracle or add descendants to ChangedIDs merely
-because their paths moved.
+Existing common Snapshot, Element, event, resource, provenance, canonical and
+native-v2 encodings remain authoritative and unchanged. Preserve every admitted
+fact and common encoding distinction: IDs, full Scope, parent relationships,
+text, UTC nanoseconds, nullable values, empty policies, separate manual blockers
+and array order. Markdown is never a source of facts, identity or authority.
+Provider shape admission and shared domain graph admission stay at their existing
+boundaries; no slug length, parent-existence or topology constraint is added.
+
+Within each existing `scopes/<ProductID>/<BoardID>/gen-<token>/` generation,
+retain machine state and place the Element at zero-based index i of the existing
+bytewise-ID-sorted Snapshot.Elements in `elements/<five-decimal-digit-i>/`.
+Each slot has exactly `README.md` and `progress.md`; 10,000 Elements use slots
+00000 through 09999. This is one uniform mapping, independent of names and
+ancestry. Identity remains (ProductID, BoardID, canonical Element.ID), never a
+slot; the pinned snapshot is the exact slot-to-ID mapping. Insert/delete may
+rerank slots, so a reader/checkpoint pins the complete generation.
+
+Each Markdown file is a deterministic generated view: the line
+`Generated view; snapshot.json is authoritative. Native display defaults are not stored facts.`,
+a blank line, then canonical renderer output from native source
+09bac3d89822c9b83c04dff6483d7b2074097a82 with MarkdownSource nil. README copies
+Title, Description, Scope and AcceptanceCriteria to AC. Progress copies
+representable like-named fields, maps UpdatedAt to LastUpdate and nil timestamps
+to native zero time, stable-filters ResourceRefs by Type into the native lists,
+and leaves Blocks empty. Do not replace BlockedBy with ManualBlockedBy. Native
+whole-second display, policy defaults, grouped resources and omitted fields are
+view-only; their complete original distinctions remain in the machine snapshot.
+No parse/render round-trip or native CLI writable-layout compatibility is claimed.
+
+Add a required projection_sha256 field to the provider-local envelope. It binds
+a compact canonical UTF-8 projection.json manifest, with ordered fields layout,
+scope, revision, snapshot_sha256, files. Layout is id-rank-pairs/1; Scope and
+Revision use unchanged common encoding. Files is a bytewise-path-sorted array
+of entries with ordered fields path, size, sha256 (relative slot path, byte size,
+lowercase SHA256). It lists exactly the two view files for every snapshot slot.
+The scope, revision, snapshot digest, manifest, complete file set and every
+rendered byte must agree within the same envelope/commit decision. No caller path
+or external writer is accepted. Missing, extra, changed, unsafe or mixed-generation
+views refuse, preserve evidence and never silently regenerate, omit or import.
+Missing/unknown schema, legacy trees, incomplete pairs and ambiguous recovery
+likewise refuse unchanged. Current private partial schema-v1 trees are not
+promoted or certified by this amendment. Existing upstream trees stay on old
+task-board; unknown source text is never silently discarded.
+
+Execution/CR-derived authority hooks remain outside this provider. The supported
+later-script route for domain-valid native-v2 state remains EnsureEmpty followed
+by explicit same-Scope, matching-Board, empty-target import under P3. Repeated
+EnsureEmpty never clears state. No arbitrary file loading, cross-scope mapping,
+legacy/no-schema admission, conversion prerequisite or format relaxation follows.
+
+Renaming/reparenting a container preserves the complete descendant topology and
+all descendant facts/resources under one envelope, even when descendant Element
+values/ChangedIDs are unchanged. The id-rank-pairs/1 layout does not nest paths
+by ancestry and therefore requires no ancestor-derived directory move. Every
+changed or reranked slot, projection/manifest, fact, resource membership,
+revision and event shares the same commit decision. C45 and C13-C16 must cover
+whole-subtree logical coherence plus first/last physical slot writes, reranking,
+sync/decision, crash recovery and double reopen, including destination conflicts
+at their existing domain boundary. Logically unchanged descendants never enter
+ChangedIDs merely because projections or locations changed. C31/C49 require
+canonical-fact round-trips and exact view integrity, not lossless Markdown
+parsing. C50 must measure maximum-state projection/reranking space, write/sync
+costs and recovery under unchanged common bounds; no feasibility is presumed.
 
 ### Common capacity decisions and recovery
 

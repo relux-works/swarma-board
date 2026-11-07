@@ -1,153 +1,101 @@
-# Filesystem provider draft
+# Filesystem provider with generated views
 
-This Linux-only backend stores actual scoped facts and payload files. It imports
-only the shared protocol and the standard library. It has no listener, database
-engine, ambient root discovery, legacy loader, migration or production wiring.
+This Linux-only backend stores scoped canonical facts and payload files. It
+imports only the shared protocol and the standard library. It has no listener,
+database engine, ambient root discovery, legacy loader, migration or production
+wiring. It implements the accepted P6 `id-rank-pairs/1` mapping for NEW trees.
+Native boards and the task-board CLI retain their existing format and behavior.
 
-**Partial implementation:** this generation core does not yet extract the pinned
-native README/progress renderer or its hierarchical element paths. It preserves
-all protocol fields and literal notes in canonical JSON, but that is not evidence
-of native markdown/path compatibility. The native-compatible tree adaptation and
-container/subtree path fault qualification remain unfinished FS work. Do not use
-the shared runner's green provider assertions as full P6, parity or release
-acceptance. Integration and native qualification remain separate.
-
-## Storage and decision
+## Facts and projections
 
 `Open` requires an existing absolute canonical directory owned by the service UID
-with mode 0700. Only a completely empty directory acquires a new recognized
-schema. Nonempty roots without that schema refuse intact. A real nonblocking
-`flock` owner lock remains held until `Close` drains admitted operations. Another
-owner refuses within the shared two-second acquisition budget. Operations use
-separate locks keyed by the complete product/board pair.
+with mode 0700. An empty root acquires exactly
+`{"format":"scoped-filesystem","version":2,"projection":"id-rank-pairs/1"}`.
+Missing or unknown schemas, including the earlier private schema-v1 layout,
+refuse intact. There is no in-place upgrade. `EnsureEmpty` provisions a complete
+scoped generation; repeating it never clears existing state. The explicit
+same-Scope, matching-Board, empty-target import guard remains unchanged.
 
-A scope contains immutable Board metadata, `CURRENT`, and one complete generation.
-Each generation contains a canonical snapshot, complete event NDJSON, raw
-content-addressed resources, and a scoped envelope binding metadata digests.
-Every operation validates the selected generation, including resource digest and
-size. Extra files, unsafe aliases, foreign scope, malformed schema and incomplete
-history refuse. No tolerant scan drops unsupported text. Integrity hashes detect
-storage corruption; they are not an authenticated history or authority proof.
+Every generation contains `snapshot.json`, `events.ndjson`, `resources/`,
+`elements/`, `projection.json` and `envelope.json`. The snapshot and complete
+contiguous event stream are authoritative. All admitted names, parent edges,
+nanoseconds, nullable fields, policies, separate manual blockers and ordered
+resource references remain in the unchanged common machine representation.
+Provider record-shape admission does not add domain graph or filename rules.
 
-An Update first syncs an intent naming the old pointer and new generation. It
-validates and syncs the complete new snapshot, every resource and all events,
-then syncs the generation directory and a new pointer. One atomic `CURRENT`
-rename followed by its parent-directory fsync decides the complete envelope.
-Before that rename, refusal removes only unpublished state. A failure after
-rename may be ambiguous: return a zero Commit with `commit_outcome_unknown`,
-latch admission, and retain evidence. Recovery checks the entire old/new state
-and all intents before changing evidence, then idempotently discards an
-unpublished generation or finishes committed cleanup. It never fabricates facts
-or events. Invalid/ambiguous evidence is retained unchanged.
+Elements in the bytewise-ID-sorted snapshot occupy generation-relative slots
+`elements/00000/` through `elements/09999/`, each with exactly `README.md` and
+`progress.md`. The snapshot is the complete slot-to-ID mapping. A slot is neither
+identity nor an API selector. Insertions and deletions may rerank every slot.
+The unchanged common maximum is 10,000 elements; record 10,001 refuses before
+publication. Full Scope and ID remain the only identity.
 
-ReadResource and Checkpoint pin read-only file descriptors to exact immutable
-inodes before releasing the scoped lock. Sequential child opens use those same
-inodes, including after membership deletion. No live membership lookup supplies
-an old checkpoint. The shared owned-handle implementation verifies bytes before
-exposure, preserves original admission deadlines, releases expired leases and
-makes Close idempotent. Close stops admission immediately and drains within the
-shared 330-second cap; timeout retains backing for a later Close.
+Each view starts with the exact line:
 
-## Capacity and topology
+```text
+Generated view; snapshot.json is authoritative. Native display defaults are not stored facts.
+```
 
-Logical limits are the unchanged common limits, including event capacity and
-retirement. Every original resource input is consumed once through verified EOF;
-logical command encoding reopens private staging only. Identical puts verify
-actual byte equality as well as size/digest. Resulting-state quotas account for
-atomic replacement and deletion. Payloads are streamed with bounded buffers.
+A blank line and the pinned native canonical renderer output follow. The
+write-only extraction in `native_view.go` comes from skill-project-management
+`09bac3d89822c9b83c04dff6483d7b2074097a82`, under Apache-2.0 (see NOTICE).
+README copies Title, Description, Scope and AcceptanceCriteria without fallback.
+Progress copies representable fields, maps UpdatedAt to LastUpdate, displays nil
+times as native zero time, stable-filters resources by type, leaves Blocks empty
+and keeps BlockedBy independent from ManualBlockedBy. Seconds-only display,
+empty-policy defaults and grouped resources are view-only. There is no Markdown
+parser, editing interface or claim of writable native CLI interchange.
 
-This initial algorithm copies retained resources and the complete event stream
-into each new generation. Temporary space can approach twice the old/new logical
-state, plus metadata. Old inodes pinned by readers also consume space until their
-leases end. ENOSPC before publication leaves the old state; it is not a quota
-reclamation or engine-shrink promise. Maximum-state RAM, sync cost, temporary
-space and 300/600-second workload budgets have **not** been qualified.
+The provider-local envelope requires `projection_sha256`, binding compact UTF-8
+`projection.json`. Its field order is layout, scope, revision, snapshot_sha256,
+files; entries are path, size, sha256 in bytewise path order. Every read validates
+the complete exact slot/file set, permissions, private regular-file ownership,
+manifest and deterministic rendered bytes against the selected snapshot. A view
+edit refuses even if its hashes and envelope are recomputed. Missing, extra,
+unsafe, cross-scope or mixed-generation bytes refuse without repair or import.
+Hashes detect inconsistent storage; they do not authenticate a hostile writer.
 
-The complete max-uint64 history fixture is impossible under contiguous history
-and the finite 256 MiB event cap. No counter injection invents that history.
-Scope retirement has no compaction/reset/cross-scope carry-forward operation.
+## Commit, reads and recovery
 
-Only cooperative single-owner service storage is supported. A shared Unix UID
-is one custody boundary; permissions and journals grant no principal authority.
-No external writer may share the live root. Linux process kills do not establish
-power-loss durability, macOS behavior or any production admission.
+A real nonblocking `flock` holds root ownership through `Close`; scoped locks use
+the full product/board pair and the unchanged two-second acquisition cap. One
+Update syncs a durable intent, then a complete new generation: facts, payloads,
+events, every projection file and slot directory, manifest and envelope. A synced
+new pointer followed by atomic `CURRENT` rename and parent fsync decides all of
+it. Predecision failures discard only the known unpublished attempt. Failures
+after rename return zero success values with `commit_outcome_unknown`, latch
+admission and retain recovery evidence. Recovery validates retained decisions
+and complete generations before cleanup; ambiguous or corrupt evidence refuses.
 
-## Evidence and reusable test seam
+Rename/reparent preserves the complete logical descendant topology. Physical
+paths do not encode ancestry. Unchanged descendant records stay outside
+ChangedIDs even if insertion reranks their slots. Each read/checkpoint validates
+one complete generation; checkpoints detach its exact metadata/history and pin
+its resource inodes before releasing the scope lock. They never follow a later
+CURRENT. Original caller budgets and common owned-handle semantics are retained.
 
-The adapter tests supply the unchanged `conformance.Factory` Instance seams:
-Provider, Provisioner, same-root Restart, distinct real peer handle and Cleanup.
-The physical FaultDriver is test-only. It maps journal sync, first/last write,
-resource payload/membership, event publication, rename, parent sync, cleanup,
-recovery and exposed read/close points to the actual code. Error injection is a
-deterministic control; it is not a claim of real disk exhaustion or hardware
-failure. Kill mode invokes the same backend in a separate test process and
-records actual SIGKILL exit status and clocks. No simulated kill satisfies it.
+## Controls and remaining qualification
 
-The common runner retains fifty explicit results. Server/domain integration,
-native OS/filesystem qualification and large workloads are NOT_RUN here. The
-256 MiB raw-resource scope case is also NOT_RUN in the bounded worker: metadata
-and copy staging necessarily exceed its 256 MiB-per-fixture physical allowance.
-No shared limit is reduced to fit that allowance. A later authorized fixture
-budget is needed. Complete history-cap installation is not supplied.
+Direct tests cover exact fact and checkpoint-byte round-trips, literal native
+view output, display-only equivalences, insert/delete reranking, full-Scope
+isolation, admitted orphan/cycle facts, missing/extra/edited/unsafe pairs, manifest
+binding, a coherently rehashed edit and the 10,000/10,001 slot boundary. The slot
+boundary uses small records and is not maximum-state workload qualification.
 
-A separate 16 MiB disposable tmpfs control exercises actual ENOSPC, old-state
-rollback and clean reopen after space is provided. Its initial failure exposed
-a truncated-intent cleanup bug, which was corrected. This small physical control
-does not establish maximum-state capacity or native durability. Long-caller
-lifetime checks have produced both passes and failures near the shared runner's
-expiry boundary; retain those failures and hold lifetime qualification. The
-shared conformance cancellation assertions have since been corrected and
-independently accepted at the common component boundary. Individual backend
-assertions remain evidence only, not full conformance or release verdicts.
+The backend fault driver maps first/last projection writes and manifest sync in
+addition to the existing intent/resource/event/decision/recovery points. Subtree
+rename/reparent with simultaneous reranking compares whole old/new facts,
+provenance, membership, payloads and events after real process death or injected
+failure and double reopen. These are provider controls. Domain destination
+conflicts and end-to-end C45 integration remain separate. C31/C49 map to
+canonical-fact round-trips plus deterministic view integrity, not Markdown
+parse/render equivalence. Frozen common runner vectors remain unchanged; their
+historical spec digest does not certify this amended layout.
 
-## Source mechanisms
-
-The design was checked against `relux-works/skill-project-management` at
-`09bac3d89822c9b83c04dff6483d7b2074097a82`, tree
-`e5d993f465092c00e88170c9628015bb8432ac1d`: `progress_pair.go` journal-before-write
-and whole-pair recovery; `activity_transaction.go` prepared/committed rollback;
-`fs_store.go` content sync versus parent-directory durability; and
-`board_write_journal.go`'s explicit non-authorizing boundary. The draft extends
-those storage principles to one complete provider envelope. It does not copy
-upstream CLI, execution authority, credentials or fallback discovery, and does
-not claim that the native renderer/path extraction has been completed. Existing
-repository LICENSE and NOTICE remain applicable.
-
-## Composition and checkpoint lifetime
-
-Checkpoint backing release stops its admission timer and caller subscription
-without canceling the retained admission outcome. The common checkpoint owns
-child cancellation. The admission checks the original caller and absolute
-admission deadline directly; staging never starts a fresh lifetime budget.
-Normal completed export can therefore finalize backing successfully, while
-caller cancellation or expiry during output still fails the whole export.
-Release remains idempotent and frees pinned descriptors and the provider lease.
-The backend controls cover empty, history-only and resource-bearing exports,
-caller cancellation during writes, owned-child cancellation/deadline propagation,
-and complete rollback after ordinary, typed, wrapped and context source errors.
-
-This composition retains the native markdown/path gaps above. A corrected
-common implementation and successful storage-core controls do not complete
-native tree fidelity, server integration, paired parity, maximum-state workload
-or power-loss qualification. Fresh independent review of the complete composed
-backend and the required integration marker remain prerequisites to publication.
-
-The existing canonical native renderer is not a lossless replacement for the
-protocol snapshot: it defaults omitted review/task-class values, groups resource
-references by type, writes timestamps at whole-second precision and has no
-independent manual-blocker field. Native creation also requires a nonempty
-sanitized filename and a resolvable parent path, whereas provider record-shape
-validation does not establish those properties or a filename length limit.
-The frozen P6 instruction requires these adaptation seams to be reported for
-contract review. No fallback filename encoding, extra admission restriction,
-progress reader or new native format is inferred here. The canonical JSON
-envelope preserves the protocol facts, but does not resolve native compatibility.
-
-The FS export regression now requires the accepted common Close semantics:
-successful exports retain repeatable successful Close; caller-canceled exports
-retain the same closed unavailable/context-cancellation error on repeated Close.
-This changes an FS-owned assertion, not the shared oracle or backing behavior.
-An additional direct-provider control covers live completion, caller cancellation
-and a real short caller deadline, including an outstanding child, stable closed
-errors, retained metadata/history and complete provider cleanup. It uses the
-actual returned checkpoint and leaves all common lifetime caps unchanged.
+The algorithm copies retained payloads, events and up to 20,000 projected files
+per update. Temporary space and sync/write amplification can be substantial;
+maximum-state projection/reranking costs, C50, event-cap fixtures, physical
+power-loss durability, paired DB/FS parity and native deployment qualification
+remain unqualified. No common limits or 30/300/600-second budgets are changed.
+Fresh independent whole-source review and an exact new integration marker are
+required before public PR or landing. This local successor authorizes neither.

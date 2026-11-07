@@ -420,7 +420,11 @@ func (p *Provider) generation(ctx context.Context, dir, gen string, old diskStat
 	if err := p.hit(ctx, "revision_event"); err != nil {
 		return pointer{}, err
 	}
-	env := envelope{Scope: snap.Board.Scope, SnapshotSHA256: hash(snapshot.Bytes()), EventsSHA256: hex.EncodeToString(h.Sum(nil))}
+	projectionDigest, err := p.writeProjection(ctx, location, snap, hash(snapshot.Bytes()))
+	if err != nil {
+		return pointer{}, err
+	}
+	env := envelope{Scope: snap.Board.Scope, SnapshotSHA256: hash(snapshot.Bytes()), EventsSHA256: hex.EncodeToString(h.Sum(nil)), ProjectionSHA256: projectionDigest}
 	eb, _ := json.Marshal(env)
 	if err := p.write(location+"/envelope.json", eb); err != nil {
 		return pointer{}, err
