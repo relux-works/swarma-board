@@ -29,7 +29,7 @@ assertions succeed. No case is skipped or weakened.
 | C18 | provider | Reverse order, nested null/order/metadata, exact restart; Compare gate supplies cross-factory comparison | Executed; real comparison not executed |
 | C19 | provider | Exact/one-over element/provenance counts/bytes/names, Snapshot bytes and complete event NDJSON through streamed HistoryDriver fixture | Fixture generator controlled; real boundaries not executed |
 | C20 | provider | Schema/scope/recovery corruption and readiness refusal; retained physical evidence review remains | Real driver required; partial |
-| C21 | provider | Admission stop, live-reader drain, idempotent Close and actual 330s paused-storage timeout/release; final-error injection remains | Not executed; partial |
+| C21 | provider | Admission stop, live-reader drain, idempotent Close, actual 330s paused-storage timeout/release and mapped stable final-close-error injection | Real factory/driver required; not executed |
 | C22 | provider | Actual peer opener with measured finite refusal or two-handle CAS winner | Real peer required |
 | C23 | server-domain | Shared lifecycle/query/plan/filter/count and foreign edges | Later shared integration |
 | C24 | server-domain | Old formats preserved; native-v2/one Update/dry-run/v1-loss refusal | Later shared integration |
@@ -44,7 +44,7 @@ assertions succeed. No case is skipped or weakened.
 | C33 | provider | Empty/abc one-shot puts, exact readers/catalog, reopen, idempotent membership, early close | Executed; unconsumed input rejected |
 | C34 | provider | Full malformed URN/digest/size/hash/duplicate/dangling/delete matrix and valid case variants | Executed |
 | C35 | provider | Same digest independent scopes; pinned old readers across delete/restart | Executed |
-| C36 | provider | Input fault, pinned catalog, single child/reopen/close semantics; combined C13-C16 repetitions remain | Executed streaming portion; partial |
+| C36 | provider | Input fault, pinned catalog, single child/reopen/close and C13-C16 repetitions with old-reference deletion/new-resource replacement in the same envelope | Streaming and replacement baseline controls executed; real fault/evidence NOT_VERIFIED |
 | C37 | provider | File/scope/count at/one-over and replacement at cap; whole-encoder guards verified separately, backend budget qualification remains | Encoder controls only; partial |
 | C38 | provider | Real stopped payload/digest/size/catalog corruption plus mapped late reader/close failures through resource reads and checkpoint encoder | Encoder late-failure controls executed; real faults not executed |
 | C39 | server | Resource authorization/bounds/no existence leak/fetch/path/fallback | Later shared integration |
@@ -54,7 +54,7 @@ assertions succeed. No case is skipped or weakened.
 | C43 | server-domain | Last-reference lifecycle/replacement/quota and complete fault repetition | Later shared integration |
 | C44 | server-domain | Provider opaque NUL/empty/non-UTF8 vs domain NUL refusal/export | Provider stream helper control only; integration NOT_VERIFIED |
 | C45 | server-domain | Shared subtree moves/descendants/physical fault coverage/quiescent parity | Later shared integration + real faults |
-| C46 | provider | Exact event headroom, one-byte overflow refusal, smaller event fills/seals, at-cap reads, distinct empty scope and real disk-full hooks; other-cap cleanup/restore composition remains | Fixture generator controlled; real backend/integration NOT_VERIFIED |
+| C46 | provider | Fact/provenance/resource cap cleanup/retry, exact event headroom/one-byte overflow/sealing, at-cap reads, distinct empty scope and disk-full hooks; restore composition remains | Fixture generator controlled; real backend/integration NOT_VERIFIED |
 | C47 | server | Explicit v1 product binding/disabled route and independent v2 | Later shared integration |
 | C48 | server-domain | Deliberately unsupported old activity/inert provenance | Later shared integration |
 | C49 | provider | Literal markdown/provenance/EnsureEmpty/restart and strict unsafe-tree fixtures; native-v2/current-native admission conflict remains | Real factory/driver/integration required; partial |

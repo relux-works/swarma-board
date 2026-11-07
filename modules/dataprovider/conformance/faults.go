@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -76,7 +77,11 @@ func envelopeChange(s *session) dp.ChangeSet {
 	task := dp.CloneElement(s.seed[2])
 	task.Notes = "changed task"
 	task.ResourceRefs = []dp.ResourceRef{ref(abcDigest), ref(emptyDigest)}
-	return dp.ChangeSet{Upserts: []dp.Element{task, story}, Provenance: []dp.ProvenanceFile{provenance("envelope", "whole")}, PutResources: []dp.ResourceInput{input("abc"), input("")}}
+	cs := dp.ChangeSet{Upserts: []dp.Element{task, story}, Provenance: []dp.ProvenanceFile{provenance("envelope", "whole")}, PutResources: []dp.ResourceInput{input("abc"), input("")}}
+	if s.resourceReplacement {
+		cs.DeleteResources = []string{info([]byte("old")).SHA256}
+	}
+	return cs
 }
 func expectedEnvelope(t *testing.T, s *session, old observation) (dp.Snapshot, []dp.Event) {
 	want := dp.CloneSnapshot(old.snapshot)
@@ -86,7 +91,12 @@ func expectedEnvelope(t *testing.T, s *session, old observation) (dp.Snapshot, [
 	want.Elements[2].ResourceRefs = []dp.ResourceRef{ref(abcDigest), ref(emptyDigest)}
 	want.Provenance = []dp.ProvenanceFile{provenance("envelope", "whole")}
 	want.Resources = []dp.ResourceInfo{{SHA256: abcDigest, Size: 3}, {SHA256: emptyDigest}}
-	events := append(dp.CloneEvents(old.events), dp.Event{FormatVersion: 1, Scope: s.scope(), Revision: want.Revision, Actor: s.actor, ChangedIDs: []string{"STORY-1", "TASK-1"}, ChangedResourceIDs: []string{abcDigest, emptyDigest}})
+	changedResources := []string{abcDigest, emptyDigest}
+	if s.resourceReplacement {
+		changedResources = append(changedResources, info([]byte("old")).SHA256)
+		sort.Strings(changedResources)
+	}
+	events := append(dp.CloneEvents(old.events), dp.Event{FormatVersion: 1, Scope: s.scope(), Revision: want.Revision, Actor: s.actor, ChangedIDs: []string{"STORY-1", "TASK-1"}, ChangedResourceIDs: changedResources})
 	return want, events
 }
 func startEnvelope(s *session) <-chan updateResult {

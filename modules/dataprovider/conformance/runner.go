@@ -94,21 +94,22 @@ func (r Report) RequireAll(t *testing.T) {
 }
 
 type session struct {
-	t            *testing.T
-	ctx          context.Context
-	root         string
-	name         string
-	factory      Factory
-	instance     *Instance
-	p            dp.Provider
-	provision    dp.Provisioner
-	faults       FaultDriver
-	receipts     []FaultReceipt
-	parent       *session
-	observations map[string]CanonicalObservation
-	boards       []dp.Board
-	seed         []dp.Element
-	actor        dp.Actor
+	t                   *testing.T
+	ctx                 context.Context
+	root                string
+	name                string
+	factory             Factory
+	instance            *Instance
+	p                   dp.Provider
+	provision           dp.Provisioner
+	faults              FaultDriver
+	receipts            []FaultReceipt
+	parent              *session
+	observations        map[string]CanonicalObservation
+	resourceReplacement bool
+	boards              []dp.Board
+	seed                []dp.Element
+	actor               dp.Actor
 }
 
 func newSession(t *testing.T, f Factory, d FaultDriver) *session {
@@ -162,6 +163,7 @@ func (s *session) scope() dp.Scope { return s.boards[0].Scope }
 func (s *session) fresh(t *testing.T) *session {
 	child := newSession(t, s.factory, s.faults)
 	child.parent = s
+	child.resourceReplacement = s.resourceReplacement
 	return child
 }
 func (s *session) rev(n uint64) dp.Revision { return dp.Revision{Scope: s.scope(), Counter: n} }
@@ -172,12 +174,26 @@ func (s *session) setup() {
 		a := s.actor
 		a.RequestID = "seed"
 		a.Operation = "create"
-		c, err := s.p.Update(s.ctx, b.Scope, dp.Revision{Scope: b.Scope}, a, func(dp.Snapshot) (dp.ChangeSet, error) { return dp.ChangeSet{Upserts: cloneSeed(s.seed)}, nil })
+		seed := cloneSeed(s.seed)
+		resources := []dp.ResourceInfo{}
+		changedResources := []string{}
+		if s.resourceReplacement {
+			seed[2].ResourceRefs = []dp.ResourceRef{ref(info([]byte("old")).SHA256)}
+			resources = []dp.ResourceInfo{info([]byte("old"))}
+			changedResources = []string{resources[0].SHA256}
+		}
+		c, err := s.p.Update(s.ctx, b.Scope, dp.Revision{Scope: b.Scope}, a, func(dp.Snapshot) (dp.ChangeSet, error) {
+			cs := dp.ChangeSet{Upserts: seed}
+			if s.resourceReplacement {
+				cs.PutResources = []dp.ResourceInput{input("old")}
+			}
+			return cs, nil
+		})
 		must(s.t, err)
-		equal(s.t, c, dp.Commit{Revision: dp.Revision{Scope: b.Scope, Counter: 1}, ChangedIDs: []string{"EPIC-1", "STORY-1", "TASK-1"}, ChangedResourceIDs: []string{}})
+		equal(s.t, c, dp.Commit{Revision: dp.Revision{Scope: b.Scope, Counter: 1}, ChangedIDs: []string{"EPIC-1", "STORY-1", "TASK-1"}, ChangedResourceIDs: changedResources})
 		o := s.observe(b.Scope)
-		equal(s.t, o.snapshot, dp.Snapshot{Board: b, Revision: dp.Revision{Scope: b.Scope, Counter: 1}, Elements: cloneSeed(s.seed), Provenance: []dp.ProvenanceFile{}, Resources: []dp.ResourceInfo{}})
-		equal(s.t, o.events, []dp.Event{{FormatVersion: 1, Scope: b.Scope, Revision: dp.Revision{Scope: b.Scope, Counter: 1}, Actor: a, ChangedIDs: []string{"EPIC-1", "STORY-1", "TASK-1"}, ChangedResourceIDs: []string{}}})
+		equal(s.t, o.snapshot, dp.Snapshot{Board: b, Revision: dp.Revision{Scope: b.Scope, Counter: 1}, Elements: seed, Provenance: []dp.ProvenanceFile{}, Resources: resources})
+		equal(s.t, o.events, []dp.Event{{FormatVersion: 1, Scope: b.Scope, Revision: dp.Revision{Scope: b.Scope, Counter: 1}, Actor: a, ChangedIDs: []string{"EPIC-1", "STORY-1", "TASK-1"}, ChangedResourceIDs: changedResources}})
 	}
 }
 func cloneSeed(in []dp.Element) []dp.Element {

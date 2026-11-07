@@ -284,7 +284,23 @@ func checkpointCase(t *testing.T, s *session) string {
 		t.Fatal("closed checkpoint opened resource")
 	}
 	equal(t, cp.Snapshot(), before)
-	return "Streaming/checkpoint assertions implemented; combined C13-C16 transaction fault repetitions remain NOT_VERIFIED"
+	if gap := missingFaults(s); gap != "" {
+		return gap
+	}
+	combined := s.fresh(t)
+	combined.resourceReplacement = true
+	gaps := []string{}
+	for _, scenario := range []struct {
+		name string
+		run  providerCase
+	}{{"coherent-combined", concurrentFaultCase}, {"pre-decision-combined", preDecisionCase}, {"post-decision-combined", postDecisionCase}, {"ambiguous-combined", ambiguousCase}} {
+		t.Run(scenario.name, func(t *testing.T) {
+			if gap := scenario.run(t, combined); gap != "" {
+				gaps = append(gaps, gap)
+			}
+		})
+	}
+	return strings.Join(gaps, "; ")
 }
 func resourceChangesCase(t *testing.T, s *session) string {
 	s.setup()

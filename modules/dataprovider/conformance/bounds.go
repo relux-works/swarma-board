@@ -33,6 +33,9 @@ func metadataBoundsCase(t *testing.T, s *session) string {
 		e := dp.CloneElement(local.seed[2])
 		e.ID = "TASK-99999"
 		local.refuse(dp.ChangeSet{Upserts: []dp.Element{e}}, dp.InvalidSnapshot)
+		local.apply(dp.ChangeSet{Deletes: []string{"TASK-9998"}}, "count-cleanup")
+		_, retry := local.apply(dp.ChangeSet{Upserts: []dp.Element{e}}, "count-retry")
+		equal(t, len(retry.snapshot.Elements), dp.MaxElements)
 	})
 	t.Run("provenance-count", func(t *testing.T) {
 		local := s.fresh(t)
@@ -45,6 +48,8 @@ func metadataBoundsCase(t *testing.T, s *session) string {
 		equal(t, len(at.snapshot.Provenance), dp.MaxProvenanceCount)
 		files = append(files, provenance("extra", ""))
 		local.refuse(dp.ChangeSet{Provenance: files}, dp.InvalidSnapshot)
+		local.apply(dp.ChangeSet{Provenance: []dp.ProvenanceFile{}}, "provenance-cleanup")
+		local.apply(dp.ChangeSet{Provenance: []dp.ProvenanceFile{provenance("extra", "")}}, "provenance-retry")
 	})
 	t.Run("provenance-bytes-and-names", func(t *testing.T) {
 		local := s.fresh(t)
@@ -61,6 +66,7 @@ func metadataBoundsCase(t *testing.T, s *session) string {
 		local.apply(dp.ChangeSet{Provenance: []dp.ProvenanceFile{file}}, "provenance-byte-cap")
 		file = provenance("one-over", strings.Repeat("x", int(dp.MaxProvenanceBytes)+1))
 		local.refuse(dp.ChangeSet{Provenance: []dp.ProvenanceFile{file}}, dp.PayloadTooLarge)
+		local.apply(dp.ChangeSet{Provenance: []dp.ProvenanceFile{}}, "provenance-byte-cleanup")
 	})
 	t.Run("snapshot-bytes", func(t *testing.T) {
 		local := s.fresh(t)
@@ -80,6 +86,8 @@ func metadataBoundsCase(t *testing.T, s *session) string {
 		// these counters stay single-digit, isolating the Notes byte boundary.
 		e.Notes += "x"
 		local.refuse(dp.ChangeSet{Upserts: []dp.Element{e}}, dp.PayloadTooLarge)
+		e.Notes = ""
+		local.apply(dp.ChangeSet{Upserts: []dp.Element{e}}, "snapshot-cleanup")
 	})
 	if _, ok := s.faults.(HistoryDriver); !ok {
 		return "Element/provenance/Snapshot boundaries implemented; real complete event-NDJSON fixture installer not supplied"
@@ -123,6 +131,8 @@ func resourceBoundsCase(t *testing.T, s *session) string {
 		// Resulting-state replacement at the cap must not charge old+new bytes.
 		replacement := generatedInput('j', dp.MaxResourceBytes)
 		local.apply(dp.ChangeSet{PutResources: []dp.ResourceInput{replacement}, DeleteResources: []string{at.Info.SHA256}}, "at-cap-replace")
+		local.apply(dp.ChangeSet{DeleteResources: []string{replacement.Info.SHA256}}, "raw-quota-cleanup")
+		local.apply(dp.ChangeSet{PutResources: []dp.ResourceInput{input("x")}}, "raw-quota-retry")
 	})
 	t.Run("resource-count", func(t *testing.T) {
 		local := s.fresh(t)
@@ -136,6 +146,9 @@ func resourceBoundsCase(t *testing.T, s *session) string {
 		_, at := local.apply(dp.ChangeSet{PutResources: puts}, "resource-count-at")
 		equal(t, len(at.snapshot.Resources), dp.MaxResourceCount)
 		local.refuse(dp.ChangeSet{PutResources: []dp.ResourceInput{input("extra")}}, dp.InvalidSnapshot)
+		local.apply(dp.ChangeSet{DeleteResources: []string{at.snapshot.Resources[0].SHA256}}, "membership-cleanup")
+		_, retry := local.apply(dp.ChangeSet{PutResources: []dp.ResourceInput{input("extra")}}, "membership-retry")
+		equal(t, len(retry.snapshot.Resources), dp.MaxResourceCount)
 	})
 	return "32MiB/file,256MiB/raw-scope,10000-membership boundaries and resulting-state replacement implemented; whole ChangeSet/Checkpoint guard qualification is separate encoder harness evidence"
 }
@@ -217,7 +230,43 @@ wait:
 		local.restart()
 		local.unchanged(old)
 	})
-	return "Timely drain and actual 330s blocked-storage timeout actions implemented; adapter final-close-error injection remains NOT_VERIFIED"
+	closePoints, gap := mappedPoints(t, s, DuringProviderClose)
+	if gap != "" {
+		return gap
+	}
+	for _, point := range closePoints {
+		t.Run("stable-close-error-"+point.ID, func(t *testing.T) {
+			local := s.fresh(t)
+			local.setup()
+			old := local.observe(local.scope())
+			ticket := arm(t, local, point, ProviderCloseFailure)
+			done := make(chan error, 1)
+			go func() { done <- local.p.Close() }()
+			must(t, ticket.WaitReached(local.ctx))
+			trigger(t, local, ticket, point, ProviderCloseFailure)
+			var first error
+			select {
+			case first = <-done:
+			case <-local.ctx.Done():
+				t.Fatal("final close exceeded bound")
+			}
+			code(t, first, dp.StorageError)
+			second := local.p.Close()
+			code(t, second, dp.StorageError)
+			equal(t, first.Error(), second.Error())
+			if !errors.Is(first, second) {
+				t.Fatal("final close error is not stable")
+			}
+			_, err := local.p.View(local.ctx, local.scope())
+			code(t, err, dp.Unavailable)
+			must(t, ticket.Close())
+			// Cleanup/restart belongs to the test controller after final close; no
+			// second physical close is allowed to replace the stable final error.
+			local.restart()
+			local.unchanged(old)
+		})
+	}
+	return ""
 }
 func peerCase(t *testing.T, s *session) string {
 	s.setup()
@@ -493,7 +542,12 @@ func capacityCase(t *testing.T, s *session) string {
 	if _, ok := s.faults.(HistoryDriver); !ok {
 		return "Real complete event history fixture installer required for warning/refusal/sealing/at-cap reads"
 	}
-	t.Run("terminal-history", func(t *testing.T) { local := s.fresh(t); local.setup(); eventCapacity(t, local) })
+	t.Run("fact-provenance-resource-capacity-cleanup-and-history", func(t *testing.T) {
+		if gap := metadataBoundsCase(t, s); gap != "" {
+			t.Fatal(gap)
+		}
+		resourceBoundsCase(t, s)
+	})
 	points, gap := mappedPoints(t, s, BeforeDecision)
 	if gap != "" {
 		return gap
@@ -515,7 +569,7 @@ func capacityCase(t *testing.T, s *session) string {
 			local.unchanged(old)
 		})
 	}
-	return "Exact event admission/sealing/at-cap read and disk-full actions implemented; at-other-cap cleanup and native-v2 cross-scope refusal/same-scope empty-server restoration require shared integration"
+	return "Fact/provenance/resource resulting-state cleanup, exact event admission/sealing/at-cap reads and disk-full actions implemented; native-v2 cross-scope refusal/same-scope empty-server restoration requires shared integration"
 }
 
 func eventCapacity(t *testing.T, s *session) {

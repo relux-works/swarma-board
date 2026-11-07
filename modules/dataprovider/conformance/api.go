@@ -35,18 +35,20 @@ const (
 	DuringRecovery      Stage = "during_recovery"
 	DuringResourceRead  Stage = "during_exposed_resource_read"
 	DuringResourceClose Stage = "during_exposed_resource_close"
+	DuringProviderClose Stage = "during_provider_final_close"
 )
 
 type FaultMode string
 
 const (
-	Pause            FaultMode = "pause"
-	DefiniteFailure  FaultMode = "definite_failure"
-	Kill             FaultMode = "kill"
-	AmbiguousFailure FaultMode = "ambiguous_failure"
-	DiskFull         FaultMode = "disk_full_before_decision"
-	ReadFailure      FaultMode = "late_resource_read_failure"
-	CloseFailure     FaultMode = "late_resource_close_failure"
+	Pause                FaultMode = "pause"
+	DefiniteFailure      FaultMode = "definite_failure"
+	Kill                 FaultMode = "kill"
+	AmbiguousFailure     FaultMode = "ambiguous_failure"
+	DiskFull             FaultMode = "disk_full_before_decision"
+	ReadFailure          FaultMode = "late_resource_read_failure"
+	CloseFailure         FaultMode = "late_resource_close_failure"
+	ProviderCloseFailure FaultMode = "provider_final_close_failure"
 )
 
 type FaultPoint struct {

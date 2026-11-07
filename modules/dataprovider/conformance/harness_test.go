@@ -423,3 +423,20 @@ func TestFrozenFiftyCasesAndUnexecutedReport(t *testing.T) {
 		t.Fatal("missing backend reported conformance")
 	}
 }
+func TestHarnessCombinedEnvelopeResourceReplacement(t *testing.T) {
+	s := newSession(t, controlFactory(""), nil)
+	s.resourceReplacement = true
+	s.setup()
+	old := s.observe(s.scope())
+	want, events := expectedEnvelope(t, s, old)
+	c, err := s.p.Update(s.ctx, s.scope(), s.rev(1), s.actor, func(dp.Snapshot) (dp.ChangeSet, error) { return envelopeChange(s), nil })
+	must(t, err)
+	equal(t, c.Revision, s.rev(2))
+	now := s.observe(s.scope())
+	equal(t, now.snapshot, want)
+	equal(t, now.events, events)
+	r, err := s.p.ReadResource(s.ctx, s.scope(), info([]byte("old")).SHA256)
+	code(t, err, dp.NotFound)
+	equal(t, r, dp.ResourceReader{})
+	equal(t, s.read(s.scope(), abcDigest), []byte("abc"))
+}
