@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "board_base": "a1b87160b509732125ea8a6b21ade43321ffd8fc",
+  "board_base_tree": "03ac0349632592e90f2eb87fa75a3e5cf22cbf18",
+  "fs_base": "09bac3d89822c9b83c04dff6483d7b2074097a82",
+  "fs_base_tree": "e5d993f465092c00e88170c9628015bb8432ac1d",
+  "composed_main": "4bb8406e025b1377426f15e7a78be72061c023e4",
+  "composed_main_tree": "86bdc5e072993f000fca171067b3cc42797cfe22",
+  "original_review_not_covered": [
+    "database-brief.md",
+    "wire/auth-in-depth",
+    "every-conformance-oracle"
+  ],
+  "owner_requirements": [
+    "always-client-server",
+    "server-provider-protocol-in-own-module",
+    "filesystem-and-database-implementations",
+    "server-config-selects-implementation",
+    "multi-product-scope-in-protocol-and-model",
+    "adapt-existing-fs-work",
+    "contract-first-one-conformance-suite-before-two-producers",
+    "no-migration-earlier-migration-asks-superseded",
+    "existing-fs-behavior-remains",
+    "assigned-resource-protocol-first-class-content-addressing-and-explicit-bounds",
+    "urn-sha256-reference-form",
+    "bounded-native-resource-payload-own-export-reimport",
+    "native-v2-empty-target-only-no-in-place-replacement",
+    "reader-based-resource-contracts-before-interface-freeze"
+  ],
+  "proposals": [
+    {
+      "id": "module",
+      "value": "modules/dataprovider standalone standard-library Go module in existing repository; adapters remain root packages",
+      "status": "pending-contract-review"
+    },
+    {
+      "id": "scope",
+      "value": "explicit ProductID+BoardID in all storage ownership/revision/event arguments and values",
+      "status": "pending-contract-review"
+    },
+    {
+      "id": "protocol",
+      "value": "View; reader-based ReadResource; Update with one-shot caller-owned ResourceInput readers; coherent fixed-revision Checkpoint handle with owned resource readers; Ready/Close; separate EnsureEmpty; P3 defines EOF, errors, close and context ownership",
+      "status": "pending-contract-review"
+    },
+    {
+      "id": "reuse",
+      "value": "narrow FS extraction preserving recovery/markdown; adapt existing Storm/bbolt candidate rather than rewrite domain",
+      "status": "pending-contract-review"
+    },
+    {
+      "id": "wire",
+      "value": "v2 explicit scoped routes; v1 bound to one explicit server-configured product or disabled; native-v2 payload negotiation, no fallback; shared integrator owns wire/auth review",
+      "status": "pending-protocol-and-later-integration-review"
+    },
+    {
+      "id": "no-migration",
+      "value": "no conversion/copying/legacy mapping; strict FS opens new recognized-schema trees only; legacy stays old task-board; later-script openability target only",
+      "status": "binding-owner-decision-with-proposed-strict-tree-boundary"
+    },
+    {
+      "id": "resources",
+      "value": "case-insensitive reserved URN scheme and sha256 namespace; lowercase 64-hex digest, malformed forms refuse; domain last-ref/NUL policy, opaque provider, atomic integrity/quota reclaim",
+      "status": "owner-bound-reference-form-other-details-pending-review"
+    },
+    {
+      "id": "native-v2",
+      "value": "P3 bounded raw payload tar; same-scope matching-Board empty-target-only restore via EnsureEmpty then CAS; no in-place replacement, archive revision authority, event replay or persisted receipt growth",
+      "status": "owner-bound-payload-requirement-format-pending-review"
+    },
+    {
+      "id": "capacity",
+      "value": "32MiB/resource,256MiB raw scope,128MiB Snapshot,256MiB events,512MiB ChangeSet,1024MiB Checkpoint; v2 provenance ASCII name <=100 bytes; terminal read-only retirement, separate same-scope empty-server restore only, no cross-scope open-task carry-forward",
+      "status": "proposed-headroom-not-measured-parity"
+    },
+    {
+      "id": "history",
+      "value": "per-element activity/field-delta history deliberately dropped; imported activity inert provenance",
+      "status": "pending-contract-review"
+    },
+    {
+      "id": "time",
+      "value": "proposed unmeasured 30s reader lifetime,300s Update/Checkpoint lifetime,2s lock,330s Close,600s recovery; FS read unavailable allowed only during active-write contention, exact quiescent semantic parity; later wire work must align current 35s/125s client with 300s server budget",
+      "status": "pending-measured-qualification"
+    },
+    {
+      "id": "conformance",
+      "value": "one shared frozen runner/vectors for both factories; common 50-case matrix; C45 subtree fault coverage",
+      "status": "draft-contract-ready-for-review-runner-not-implemented"
+    }
+  ],
+  "unresolved": [
+    {
+      "id": "database-engine",
+      "owner": "source-owner",
+      "gap": "owner requirements do not specify engine; existing source pins Storm v3.2.1+bbolt v1.3.4; retention is a candidate, not a new decision",
+      "blocks": "DB driver/dependency implementation; not contract review"
+    },
+    {
+      "id": "fs-work-custody",
+      "owner": "source-custodian",
+      "gap": "default FS source pin inspected; no separate current FS task packet/head was supplied or identified by open-PR metadata",
+      "blocks": "claim that this is the complete intended FS candidate or that its remaining work is already proven small"
+    },
+    {
+      "id": "shared-owner",
+      "owner": "contract-owner",
+      "gap": "assign one contract/conformance/shared integration writer and exact accepted contract digest",
+      "blocks": "both adapter producer release"
+    },
+    {
+      "id": "contract-supersession",
+      "owner": "contract-review/source-owner",
+      "gap": "approve old D1 one-backend/one-module, FS exclusion and D6 frozen-type deltas explicitly",
+      "blocks": "implementation under new architecture"
+    },
+    {
+      "id": "independent-review",
+      "owner": "independent-reviewer",
+      "gap": "follow-up review requested changes; fresh delta review must bind revised docs subtree and exact proposed signed landing head/tree, followed by exact-head marker check; no inherited acceptance",
+      "blocks": "adoption/landing; publication route remains source-owned"
+    },
+    {
+      "id": "bounded-source-followups",
+      "owner": "source-owner",
+      "gap": "PR5 notes and PR6 bounded PAX fixes landed and composed unchanged; reproduction attribution remains in followups.md",
+      "blocks": "neither protocol review nor a migration gate"
+    },
+    {
+      "id": "production-admission",
+      "owner": "source/host/identity owners",
+      "gap": "production authority, per-principal isolation, native durability and remote TLS custody remain unverified",
+      "blocks": "runtime adoption/activation; not source contract review"
+    }
+  ],
+  "implementation_authorized_by_this_draft": false,
+  "review_verdict": null,
+  "finding_disposition_table": "review-disposition.md",
+  "finding_ids_addressed": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "fresh_independent_review_required": true,
+  "conformance_executed": false,
+  "runtime_qualification_claimed": false,
+  "freeze_authorized": false,
+  "landing_authorized": false,
+  "activation_authorized": false,
+  "review_status": "independent review pending",
+  "no_migration_decision": {
+    "date": "2026-11-06",
+    "owner_words": "никаких миграций не надо делать , потом скриптами по месту разберемся"
+  },
+  "landed_source_fixes": [
+    {
+      "pr": 5,
+      "head": "d2e3d201939aa88c6acdaa09bf0dcee157928b18",
+      "merged_at": "2026-11-06T22:59:31Z",
+      "preserved_unchanged": true
+    },
+    {
+      "pr": 6,
+      "head": "4bb8406e025b1377426f15e7a78be72061c023e4",
+      "merged_at": "2026-11-06T23:46:32Z",
+      "preserved_unchanged": true
+    }
+  ],
+  "followup_review": {
+    "model": "Claude Opus 5.5",
+    "separate_from_producer": true,
+    "prior_verdict": "changes-requested",
+    "revised_verdict": null,
+    "finding_ids_addressed": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "review_scope": "source decision supplies finding 1; attached follow-up review supplies findings 2-8",
+    "fresh_delta_review_required": true,
+    "exact_landing_head_marker_required": true,
+    "inherited_acceptance": false
+  }
+}
