@@ -557,22 +557,49 @@ func (p *process) Close() error {
 	_, e := p.call(context.Background(), message{Op: "close"}, nil)
 	return e
 }
+
+// Proxy admission budgets start before pipe serialization/dispatch, not when
+// the worker receives the request. Retain cancellation for the whole lease.
+func (p *process) watchLease(ctx context.Context, request uint64) {
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = p.send(message{ID: request, Kind: "cancel"})
+		case <-p.done:
+		}
+	}()
+}
 func (p *process) ReadResource(ctx context.Context, s dp.Scope, digest string) (dp.ResourceReader, error) {
+	ctx, cancel := dp.BoundedContext(ctx, dp.ReadTimeout)
 	r, e := p.call(ctx, message{Op: "read-resource", Scope: s, Digest: digest}, nil)
 	if e != nil {
+		cancel()
 		return dp.ResourceReader{}, e
 	}
-	return dp.ResourceReader{Info: r.Info, Reader: &remoteReader{p: p, ctx: ctx, id: r.Handle}}, nil
+	p.watchLease(ctx, r.ID)
+	if e := checkContext(ctx); e != nil {
+		cancel()
+		return dp.ResourceReader{}, e
+	}
+	return dp.ResourceReader{Info: r.Info, Reader: &remoteReader{p: p, ctx: ctx, id: r.Handle, cancel: cancel}}, nil
 }
 func (p *process) Checkpoint(ctx context.Context, s dp.Scope) (dp.Checkpoint, error) {
+	ctx, cancel := dp.BoundedContext(ctx, dp.CheckpointTimeout)
 	r, e := p.call(ctx, message{Op: "checkpoint", Scope: s}, nil)
 	if e != nil {
+		cancel()
 		return nil, e
 	}
-	return &remoteCheckpoint{p: p, ctx: ctx, id: r.Handle, s: r.Snapshot, events: r.Events}, nil
+	p.watchLease(ctx, r.ID)
+	if e := checkContext(ctx); e != nil {
+		cancel()
+		return nil, e
+	}
+	return &remoteCheckpoint{p: p, ctx: ctx, id: r.Handle, s: r.Snapshot, events: r.Events, cancel: cancel}, nil
 }
 
 type remoteReader struct {
+	cancel   context.CancelFunc
 	p        *process
 	ctx      context.Context
 	id       uint64
@@ -588,11 +615,17 @@ func (r *remoteReader) Read(buf []byte) (int, error) {
 	return copy(buf, m.Data), e
 }
 func (r *remoteReader) Close() error {
-	r.once.Do(func() { _, r.closeErr = r.p.call(context.Background(), message{Op: "reader-close", Handle: r.id}, nil) })
+	r.once.Do(func() {
+		_, r.closeErr = r.p.call(context.Background(), message{Op: "reader-close", Handle: r.id}, nil)
+		if r.cancel != nil {
+			r.cancel()
+		}
+	})
 	return r.closeErr
 }
 
 type remoteCheckpoint struct {
+	cancel   context.CancelFunc
 	p        *process
 	ctx      context.Context
 	id       uint64
@@ -628,6 +661,9 @@ func (c *remoteCheckpoint) Close() error {
 		c.closed = true
 		c.mu.Unlock()
 		_, c.closeErr = c.p.call(context.Background(), message{Op: "checkpoint-close", Handle: c.id}, nil)
+		if c.cancel != nil {
+			c.cancel()
+		}
 	})
 	return c.closeErr
 }
