@@ -160,8 +160,9 @@ func TestOwnedContextCancellationReleasesUnclosedHandles(t *testing.T) {
 				t.Fatal(err)
 			}
 			if cp != nil {
-				if err := cp.Close(); err != nil {
-					t.Fatal(err)
+				first, second := cp.Close(), cp.Close()
+				if !errors.Is(first, context.Canceled) || first != second {
+					t.Fatalf("canceled checkpoint Close outcome lost or unstable: %v / %v", first, second)
 				}
 			}
 		})

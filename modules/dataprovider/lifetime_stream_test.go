@@ -63,8 +63,9 @@ func TestCheckpointRetainedAdmissionWithLiveEncoder(t *testing.T) {
 					t.Fatal(err)
 				}
 				t.Cleanup(func() {
-					if err := cp.Close(); err != nil {
-						t.Error(err)
+					closed := cp.Close()
+					if phase == "live" && closed != nil || phase != "live" && !errors.Is(closed, admission.Err()) {
+						t.Errorf("cleanup lost admission outcome: %v", closed)
 					}
 				})
 				if phase == "before" {
@@ -107,10 +108,11 @@ func TestCheckpointRetainedAdmissionWithLiveEncoder(t *testing.T) {
 				if releases.Load() != 1 {
 					t.Fatalf("backing releases=%d", releases.Load())
 				}
-				// Cleanup stays nil and idempotent, including after cancellation. Normal
-				// encoder Close must never turn the live positive control into failure.
-				if err := cp.Close(); err != nil {
-					t.Fatal(err)
+				// The public outcome stays stable, including after cancellation.
+				// Live Close must never turn its own cleanup into admission failure.
+				first, second := cp.Close(), cp.Close()
+				if first != second || phase == "live" && first != nil || phase != "live" && !errors.Is(first, admission.Err()) {
+					t.Fatalf("unstable or incorrect Close outcome: %v / %v", first, second)
 				}
 				if releases.Load() != 1 {
 					t.Fatal("backing released more than once")

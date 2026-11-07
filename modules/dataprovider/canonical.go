@@ -232,7 +232,10 @@ type StagedResourceOpener func(index int) (io.ReadCloser, error)
 func encodePayload(ctx context.Context, w io.Writer, info ResourceInfo, r io.ReadCloser) (err error) {
 	defer func() {
 		if closeErr := r.Close(); err == nil && closeErr != nil {
-			err = streamError(closeErr)
+			// Finalizing private source storage cannot establish publication
+			// ambiguity or membership refusal. Destination errors retain their
+			// separate encoder/budget classification.
+			err = committedError(closeErr)
 		}
 	}()
 	if err = literal(w, `{"info":`); err != nil {
@@ -328,6 +331,8 @@ func encodeChangeSet(ctx context.Context, w io.Writer, c ChangeSet, open StagedR
 // EncodeCheckpoint consumes and closes the entire checkpoint on every path.
 // Every child is read through verified EOF and closed; any late read/close error
 // fails the whole output. It does not perform fresh current-state lookups.
+// An error may accompany partial or complete bytes; the caller must discard
+// them. A public-only decorator may report retained admission failure at Close.
 func EncodeCheckpoint(ctx context.Context, w io.Writer, cp Checkpoint) (n int64, err error) {
 	if cp == nil {
 		return 0, NewError(InvalidRequest)

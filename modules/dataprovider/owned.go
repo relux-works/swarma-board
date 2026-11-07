@@ -242,7 +242,8 @@ func (c *ownedCheckpoint) Events() []Event    { return CloneEvents(c.events) }
 
 // retainedContextError also works after Close, without mistaking Close's own
 // budget cancellation for an expired admission. Metadata access has no public
-// error result, so the encoder checks this private lifetime signal at writes.
+// error result, so the encoder can check this private signal at writes. Close
+// also reports the outcome through the public interface, including decorators.
 func (c *ownedCheckpoint) retainedContextError() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -339,7 +340,13 @@ func (c *ownedCheckpoint) Close() error {
 		if c.admissionErr == nil {
 			c.admissionErr = c.budget.Err()
 		}
-		if err == nil {
+		if c.admissionErr != nil {
+			// Metadata-only consumers and public-interface decorators may not
+			// observe child reads or the private lifetime hook. Preserve the
+			// actual admission failure as the stable public finalization result.
+			// This is captured before our own budget cleanup cancels its context.
+			err = ContextError(c.admissionErr)
+		} else if err == nil {
 			err = c.failure
 		}
 		c.closeErr = err

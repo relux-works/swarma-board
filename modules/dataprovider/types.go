@@ -82,6 +82,8 @@ type Event struct {
 // catalog. Metadata is detached on every call. Only one child need be active;
 // another open then returns invalid_request. Children may be reopened after
 // closing. Close is idempotent, closes any child, and releases backing state.
+// Close preserves an admission cancellation/expiry through finalization as a
+// stable context error; closing a live handle does not itself fail admission.
 // Closed/expired handles refuse opens/reads with unavailable (context errors
 // remain errors.Is recognizable); metadata copies remain usable.
 type Checkpoint interface {
