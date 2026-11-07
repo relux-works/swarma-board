@@ -456,3 +456,35 @@ func TestLongCallerDeadline(t *testing.T) {
 		t.Fatal("long caller extended the resource lifetime", err)
 	}
 }
+
+func TestDetectedCorruptionStopsReadiness(t *testing.T) {
+	ctx, _, i, b, a := fixture(t)
+	c := i.Provider.(*controlled)
+	gen, err := fixtureGeneration(c.root, b.Scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := replaceFixture(filepath.Join(gen, "snapshot.json"), []byte("corrupt")); err != nil {
+		t.Fatal(err)
+	}
+	before, err := fingerprintTree(c.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := i.Provider.View(ctx, b.Scope)
+	if code, _ := dp.CodeOf(err); code != dp.StorageError || snapshot.Board.Scope != (dp.Scope{}) {
+		t.Fatal("corruption exposed nonzero state", err)
+	}
+	if code, _ := dp.CodeOf(i.Provider.Ready(ctx)); code != dp.Unavailable {
+		t.Fatal("detected corruption still ready")
+	}
+	calls := 0
+	_, err = i.Provider.Update(ctx, b.Scope, dp.Revision{Scope: b.Scope}, a, func(dp.Snapshot) (dp.ChangeSet, error) { calls++; return dp.ChangeSet{}, nil })
+	if code, _ := dp.CodeOf(err); code != dp.Unavailable || calls != 0 {
+		t.Fatal("corrupt scope admitted mutation", err)
+	}
+	after, err := fingerprintTree(c.root)
+	if err != nil || before != after {
+		t.Fatal("detected corruption evidence changed", err)
+	}
+}

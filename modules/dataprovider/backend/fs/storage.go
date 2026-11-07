@@ -187,7 +187,11 @@ func (p *Provider) checkDir(name string) error {
 	return nil
 }
 func (p *Provider) load(ctx context.Context, s dp.Scope, verify bool) (diskState, error) {
-	return p.loadAt(ctx, s, scopePath(s), verify)
+	state, err := p.loadAt(ctx, s, scopePath(s), verify)
+	if code, ok := dp.CodeOf(err); ok && (code == dp.StorageError || code == dp.UnsupportedSchema) {
+		p.latch(s)
+	}
+	return state, err
 }
 func (p *Provider) loadAt(ctx context.Context, s dp.Scope, dir string, verify bool) (diskState, error) {
 	return p.loadAtPointer(ctx, s, dir, verify, nil)
