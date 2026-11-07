@@ -608,8 +608,8 @@ type remoteReader struct {
 }
 
 func (r *remoteReader) Read(buf []byte) (int, error) {
-	if e := r.ctx.Err(); e != nil {
-		return 0, dp.ContextError(e)
+	if e := proxyContextError(r.ctx); e != nil {
+		return 0, e
 	}
 	m, e := r.p.call(r.ctx, message{Op: "read", Handle: r.id, N: len(buf)}, nil)
 	return copy(buf, m.Data), e
@@ -639,9 +639,21 @@ type remoteCheckpoint struct {
 
 func (c *remoteCheckpoint) Snapshot() dp.Snapshot { return dp.CloneSnapshot(c.s) }
 func (c *remoteCheckpoint) Events() []dp.Event    { return dp.CloneEvents(c.events) }
+
+// Expiry checks also consult the absolute admission deadline: timer callbacks
+// can be queued, and worker cancellation must not erase the caller's cause.
+func proxyContextError(ctx context.Context) error {
+	if e := ctx.Err(); e != nil {
+		return dp.ContextError(e)
+	}
+	if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+		return dp.ContextError(context.DeadlineExceeded)
+	}
+	return nil
+}
 func (c *remoteCheckpoint) OpenResource(d string) (io.ReadCloser, error) {
-	if e := c.ctx.Err(); e != nil {
-		return nil, dp.ContextError(e)
+	if e := proxyContextError(c.ctx); e != nil {
+		return nil, e
 	}
 	c.mu.Lock()
 	closed := c.closed
@@ -651,10 +663,20 @@ func (c *remoteCheckpoint) OpenResource(d string) (io.ReadCloser, error) {
 	}
 	m, e := c.p.call(c.ctx, message{Op: "open-resource", Handle: c.id, Digest: d}, nil)
 	if e != nil {
+		// Retain the local deadline/cancellation cause even when the worker's
+		// cancellation notification won its own timer race.
+		if local := proxyContextError(c.ctx); local != nil {
+			return nil, local
+		}
 		return nil, e
+	}
+	if local := proxyContextError(c.ctx); local != nil {
+		_, _ = c.p.call(context.Background(), message{Op: "reader-close", Handle: m.Handle}, nil)
+		return nil, local
 	}
 	return &remoteReader{p: c.p, ctx: c.ctx, id: m.Handle}, nil
 }
+
 func (c *remoteCheckpoint) Close() error {
 	c.once.Do(func() {
 		c.mu.Lock()
