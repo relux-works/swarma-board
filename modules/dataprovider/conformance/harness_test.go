@@ -371,7 +371,11 @@ func (p *controlProvider) Checkpoint(ctx context.Context, scope dp.Scope) (dp.Ch
 func TestHarnessVerificationControlProvider(t *testing.T) {
 	for _, id := range []string{"C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10", "C11", "C17", "C18", "C33", "C34", "C35", "C36", "C40", "C41"} {
 		t.Run(id, func(t *testing.T) {
-			s := newSession(t, controlFactory(""), nil)
+			factory := controlFactory("")
+			if id == "C41" {
+				factory = commonCheckpointFactory()
+			}
+			s := newSession(t, factory, nil)
 			gap := providerCases[id](t, s)
 			if gap != "" {
 				t.Log("Harness verification only; remaining contract gap:", gap)

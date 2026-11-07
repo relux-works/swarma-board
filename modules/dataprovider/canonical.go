@@ -307,7 +307,10 @@ func encodeChangeSet(ctx context.Context, w io.Writer, c ChangeSet, open StagedR
 			if h != nil {
 				_ = h.Close()
 			}
-			return streamError(err)
+			// Opening private staging cannot establish publication ambiguity or
+			// public membership refusal. Retain the acquisition outcome over
+			// cleanup, preserving only standard context sentinels as causes.
+			return committedError(err)
 		}
 		if h == nil {
 			return NewError(StorageError)

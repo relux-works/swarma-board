@@ -342,13 +342,38 @@ func deadlinesCase(t *testing.T, s *session) string {
 		t.Fatalf("resource cancellation not recognizable: %v", err)
 	}
 	must(t, r.Reader.Close())
+	// Live finalization must stop and close a child without turning the
+	// checkpoint's own cleanup into a failure of its retained admission.
+	live, err := s.p.Checkpoint(s.ctx, s.scope())
+	closeOnRefusal(err, live)
+	must(t, err)
+	defer live.Close()
+	liveChild, err := live.OpenResource(abcDigest)
+	closeOnRefusal(err, liveChild)
+	must(t, err)
+	defer liveChild.Close()
+	must(t, live.Close())
+	must(t, live.Close())
+	_, err = liveChild.Read(buf)
+	code(t, err, dp.Unavailable)
+	must(t, liveChild.Close())
 	ctx, cancel = context.WithCancel(s.ctx)
+	defer cancel()
 	cp, err := s.p.Checkpoint(ctx, s.scope())
 	closeOnRefusal(err, cp)
 	must(t, err)
 	defer cp.Close()
 	snap := cp.Snapshot()
+	events := cp.Events()
+	retainedChild, err := cp.OpenResource(abcDigest)
+	closeOnRefusal(err, retainedChild)
+	must(t, err)
+	defer retainedChild.Close()
 	cancel()
+	_, err = retainedChild.Read(buf)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("retained checkpoint child cancellation not recognizable: %v", err)
+	}
 	child, err := cp.OpenResource(abcDigest)
 	if child != nil {
 		_ = child.Close()
@@ -357,8 +382,19 @@ func deadlinesCase(t *testing.T, s *session) string {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("checkpoint cancellation not recognizable: %v", err)
 	}
-	must(t, cp.Close())
+	first, second := cp.Close(), cp.Close()
+	for _, err := range []error{first, second} {
+		code(t, err, dp.Unavailable)
+		if _, ok := err.(*dp.Error); !ok || !errors.Is(err, context.Canceled) {
+			t.Fatalf("checkpoint Close lost closed cancellation outcome: %v", err)
+		}
+	}
+	if first != second {
+		t.Fatal("checkpoint cancellation Close outcome is not stable")
+	}
+	must(t, retainedChild.Close())
 	equal(t, cp.Snapshot(), snap)
+	equal(t, cp.Events(), events)
 	if s.faults == nil {
 		return "Caller cancellation assertions implemented; real lifetime/lock/recovery scenarios require adapter fault machinery; wire alignment is later integration"
 	}
