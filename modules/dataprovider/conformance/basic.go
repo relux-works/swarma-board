@@ -315,6 +315,8 @@ func provenance(name, data string) dp.ProvenanceFile {
 	return dp.ProvenanceFile{Path: "provenance/" + name, SHA256: hex.EncodeToString(h[:]), Data: []byte(data)}
 }
 func invalidCase(t *testing.T, s *session) string {
+	// Keep resource bytes in the refusal envelope, not just empty metadata.
+	s.resourceReplacement = true
 	s.setup()
 	e := dp.CloneElement(s.seed[2])
 	lower := e
@@ -336,6 +338,56 @@ func invalidCase(t *testing.T, s *session) string {
 		{dp.ChangeSet{Provenance: []dp.ProvenanceFile{{Path: "provenance/bad", SHA256: abcDigest, Data: []byte("wrong")}}}, dp.InvalidSnapshot},
 	} {
 		s.refuse(x.c, x.code)
+	}
+	for _, field := range []string{"CreatedAt", "UpdatedAt"} {
+		t.Run(field+"-offset-refusal-UTC-retry", func(t *testing.T) {
+			child := *s
+			child.t = t
+			s := &child
+			old := s.observe(s.scope())
+			utc := time.Date(2026, 1, 2, 3, 4, 5, 123456789, time.UTC)
+			offset := utc.In(time.FixedZone("offset", 3*60*60))
+			e := dp.CloneElement(old.snapshot.Elements[2])
+			setTime := func(value *time.Time) {
+				if field == "CreatedAt" {
+					e.CreatedAt = value
+				} else {
+					e.UpdatedAt = value
+				}
+			}
+			setTime(&offset)
+			calls := 0
+			c, err := s.p.Update(s.ctx, s.scope(), old.snapshot.Revision, s.actor, func(dp.Snapshot) (dp.ChangeSet, error) {
+				calls++
+				return dp.ChangeSet{Upserts: []dp.Element{e}}, nil
+			})
+			code(t, err, dp.InvalidSnapshot)
+			zeroCommit(t, c)
+			if calls != 1 {
+				t.Fatalf("otherwise valid fresh-CAS callback calls=%d, want 1", calls)
+			}
+			s.unchanged(old) // complete facts, events and checkpoint resource bytes
+			if !offset.Equal(utc) || offset.Nanosecond() != utc.Nanosecond() {
+				t.Fatal("time pair must differ only in UTC representation")
+			}
+			setTime(&utc)
+			calls = 0
+			c, err = s.p.Update(s.ctx, s.scope(), old.snapshot.Revision, s.actor, func(dp.Snapshot) (dp.ChangeSet, error) {
+				calls++
+				return dp.ChangeSet{Upserts: []dp.Element{e}}, nil
+			})
+			must(t, err)
+			equal(t, calls, 1)
+			want := dp.CloneSnapshot(old.snapshot)
+			want.Revision.Counter++
+			want.Elements[2] = dp.CloneElement(e)
+			equal(t, c, dp.Commit{Revision: want.Revision, ChangedIDs: []string{e.ID}, ChangedResourceIDs: []string{}})
+			now := s.observe(s.scope())
+			equal(t, now.snapshot, want)
+			wantEvents := append(dp.CloneEvents(old.events), dp.Event{FormatVersion: 1, Scope: s.scope(), Revision: want.Revision, Actor: s.actor, ChangedIDs: []string{e.ID}, ChangedResourceIDs: []string{}})
+			equal(t, now.events, wantEvents)
+			t.Logf("same-CAS retry revision=%d callback_calls=%d nanoseconds=%d", c.Revision.Counter, calls, utc.Nanosecond())
+		})
 	}
 	return ""
 }
