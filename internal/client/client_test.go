@@ -425,7 +425,7 @@ func TestTransportDoesNotInheritAmbientDefaults(t *testing.T) {
 	defer func() { http.DefaultTransport = old }()
 	c := newClient(t, s, nil)
 	tr := c.http.Transport.(*http.Transport)
-	if tr.Proxy != nil || (tr.TLSClientConfig != nil && tr.TLSClientConfig.InsecureSkipVerify) || tr.ResponseHeaderTimeout.Seconds() != 125 || tr.MaxResponseHeaderBytes != 32<<10 {
+	if tr.Proxy != nil || (tr.TLSClientConfig != nil && tr.TLSClientConfig.InsecureSkipVerify) || tr.ResponseHeaderTimeout.Seconds() != 305 || tr.MaxResponseHeaderBytes != 32<<10 {
 		t.Fatal("ambient defaults inherited or timeout/header limits wrong")
 	}
 }

@@ -214,8 +214,10 @@ func ParseETag(s string) (contract.Revision, error) {
 // request never sets GetBody; even the standard transport cannot replay writes.
 func (c *Client) request(ctx context.Context, method, path string, body []byte, headers http.Header, write, archive bool) ([]byte, http.Header, string, error) {
 	timeout := 35 * time.Second
-	if archive {
-		timeout = 125 * time.Second
+	// Keep the existing five-second wire allowance beyond the provider
+	// operation cap. The request context also bounds streamed response reads.
+	if write || archive {
+		timeout = 305 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()

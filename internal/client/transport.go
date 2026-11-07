@@ -85,7 +85,7 @@ func newHTTPTransport() *http.Transport {
 		DialContext:       (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		ForceAttemptHTTP2: true, MaxIdleConns: 16, IdleConnTimeout: 90 * time.Second,
 		TLSHandshakeTimeout: 10 * time.Second, ExpectContinueTimeout: time.Second,
-		ResponseHeaderTimeout: 125 * time.Second, MaxResponseHeaderBytes: 32 << 10,
+		ResponseHeaderTimeout: 305 * time.Second, MaxResponseHeaderBytes: 32 << 10,
 	}
 }
 
