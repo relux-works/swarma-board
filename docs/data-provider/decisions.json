@@ -6,6 +6,28 @@
   "fs_base_tree": "e5d993f465092c00e88170c9628015bb8432ac1d",
   "composed_main": "4bb8406e025b1377426f15e7a78be72061c023e4",
   "composed_main_tree": "86bdc5e072993f000fca171067b3cc42797cfe22",
+  "accepted_source_contract": {
+    "head": "f403f0ed5042e79e1b718a98bec3b839eba4b78a",
+    "tree": "197cfb7f13fe47180f6c049da983893bddb843b6",
+    "spec_sha256": "4dd57e520e9b7911c3200b5de9068847f2a451617bbe595ef236f4d6e785a13b",
+    "conformance_sha256": "9e5f34b2ea6ea1ee292aff82590c33b0d977ee6dffc3d3e7e6f4929e52184c7f",
+    "next_unit": "shared protocol and conformance module; adapter and integration execution remain separate"
+  },
+  "adapter_source_decisions": {
+    "filesystem": {
+      "repository": "relux-works/skill-project-management",
+      "head": "09bac3d89822c9b83c04dff6483d7b2074097a82",
+      "tree": "e5d993f465092c00e88170c9628015bb8432ac1d",
+      "status": "decided",
+      "compatibility": "read the native format written at this pin; any later source movement requires a separately reviewed re-pin"
+    },
+    "database": {
+      "engine": "Storm v3.2.1 / bbolt v1.3.4",
+      "source": "tools/board-server/go.mod at the filesystem source pin",
+      "status": "decided; no dependency upgrade"
+    },
+    "strict_tree_conflict": "The requirement to read current task-board native trees conflicts with frozen P6 strict EnsureEmpty-created schema/envelope-only admission. See modules/dataprovider/HANDOFF.md; no conversion or permissive loader is implemented."
+  },
   "original_review_not_covered": [
     "database-brief.md",
     "wire/auth-in-depth",
@@ -45,8 +67,8 @@
     },
     {
       "id": "reuse",
-      "value": "narrow FS extraction preserving recovery/markdown; adapt existing Storm/bbolt candidate rather than rewrite domain",
-      "status": "pending-contract-review"
+      "value": "narrow FS extraction at 09bac3d89822c9b83c04dff6483d7b2074097a82 preserving recovery/markdown; retain Storm v3.2.1 / bbolt v1.3.4 as board-server at that pin rather than rewrite domain",
+      "status": "source-and-engine-decided; native-format/strict-tree compatibility conflict recorded"
     },
     {
       "id": "wire",
@@ -91,16 +113,10 @@
   ],
   "unresolved": [
     {
-      "id": "database-engine",
-      "owner": "source-owner",
-      "gap": "owner requirements do not specify engine; existing source pins Storm v3.2.1+bbolt v1.3.4; retention is a candidate, not a new decision",
-      "blocks": "DB driver/dependency implementation; not contract review"
-    },
-    {
-      "id": "fs-work-custody",
-      "owner": "source-custodian",
-      "gap": "default FS source pin inspected; no separate current FS task packet/head was supplied or identified by open-PR metadata",
-      "blocks": "claim that this is the complete intended FS candidate or that its remaining work is already proven small"
+      "id": "native-format-strict-tree-conflict",
+      "owner": "contract-owner",
+      "gap": "Fixed current-native-format read requirement and accepted P6 strict new-schema/envelope-only admission disagree for current no-schema trees; exact seams in modules/dataprovider/HANDOFF.md",
+      "blocks": "adapter legacy-tree admission design; not shared protocol module production"
     },
     {
       "id": "shared-owner",
