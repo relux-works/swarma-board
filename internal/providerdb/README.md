@@ -8,11 +8,12 @@ markdown tree, migration, network service or environment-based discovery is
 supported.
 
 The provider uses **Storm v3.2.1 / bbolt v1.3.4**, retaining the repository's
-existing engine pins. The protocol core and shared conformance package are
-unchanged. `providerdb` is a separate package inside the data-provider module so
-the later shared integration can import it without a second protocol module or
-root server wiring in this change. Its module dependency pins belong to this
-backend branch; the filesystem adapter needs only the standard-library core.
+existing engine pins. The protocol module remains standard-library-only and its shared conformance
+package is unchanged. The adapter lives in root `internal/providerdb`, using the
+existing root module's exact engine pins. Shared root module wiring to the
+protocol is deferred to the shared integrator. Isolated checks use a private Go
+workspace joining the root and protocol modules; no workspace or server wiring
+is committed by this backend change.
 
 One private local-directory owner is supported. bbolt's real owner lock refuses
 another actual process within the common lock budget. Writes are globally
