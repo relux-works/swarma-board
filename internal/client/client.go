@@ -280,7 +280,14 @@ func (c *Client) request(ctx context.Context, method, path string, body []byte, 
 		if envelope.Error != nil && knownCode(envelope.Error.Code) {
 			code = envelope.Error.Code
 		}
-		e := failure(code, safeMessage(code), id, res.StatusCode)
+		message := safeMessage(code)
+		// A delivered timeout or server failure does not establish that a
+		// write was rolled back. Keep its typed error, but require the same
+		// reconciliation as a lost response before another write.
+		if write && (code == "unavailable" || code == "storage_error" || code == "transport_error" || res.StatusCode == http.StatusRequestTimeout || res.StatusCode >= 500) {
+			message = "write outcome is unknown; read and reconcile before another write"
+		}
+		e := failure(code, message, id, res.StatusCode)
 		if envelope.Error != nil {
 			var rev uint64
 			if raw, ok := envelope.Error.Details["current_revision"]; ok && json.Unmarshal(raw, &rev) == nil {

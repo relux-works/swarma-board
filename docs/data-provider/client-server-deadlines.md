@@ -27,3 +27,10 @@ The shutdown constraint remains unresolved: the executable and transport drain
 for 10 seconds while the provider proposal describes 330 seconds. This
 composition selects neither policy and does not claim that shutdown permits a
 300-second operation to finish.
+
+Delivered write errors for unavailable, storage or transport failures, HTTP
+request timeouts and server failures also retain unknown-outcome and
+read/reconcile guidance: receiving an error does not establish rollback. The
+client preserves the typed code, HTTP status and safe revision details. Reads
+and unambiguous refusals retain their existing messages and exit behavior. No
+automatic write retry is introduced.
