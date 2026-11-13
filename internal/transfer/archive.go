@@ -43,6 +43,7 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 	seen := map[string]bool{}
 	dirs := map[string]bool{}
 	count := 0
+	colonResources := map[string]string{}
 	var paxHeader []byte
 	for {
 		block := make([]byte, 512)
@@ -110,7 +111,14 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 		}
 		isDir := hdr.Typeflag == tar.TypeDir
 		pathOnly := paxHeader != nil && len(hdr.PAXRecords) == 1 && hdr.PAXRecords["path"] == hdr.Name
-		if !safePath(hdr.Name, isDir) || hdr.Linkname != "" || len(hdr.PAXRecords) != 0 && !pathOnly || len(hdr.Xattrs) != 0 {
+		validPath := safePath(hdr.Name, isDir)
+		if !validPath && !isDir && strings.Contains(hdr.Name, ":") {
+			if owner, _, ok := legacyResourcePath(hdr.Name); ok {
+				validPath = true
+				colonResources[hdr.Name] = owner
+			}
+		}
+		if !validPath || hdr.Linkname != "" || len(hdr.PAXRecords) != 0 && !pathOnly || len(hdr.Xattrs) != 0 {
 			return nil, nil, "", invalid("unsafe archive path or metadata")
 		}
 		paxHeader = nil
@@ -141,6 +149,18 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 		for parent := path.Dir(key); parent != "."; parent = path.Dir(parent) {
 			if _, ok := files[parent]; ok {
 				return nil, nil, "", invalid("file/directory path collision")
+			}
+		}
+	}
+	// Staging a name is not admission: only a closed legacy-v2 manifest and
+	// an actual owning element can authorize an inert resource label.
+	if len(colonResources) > 0 {
+		if !confirmedLegacyResources(files) {
+			return nil, nil, "", invalid("unsafe archive path or metadata")
+		}
+		for _, owner := range colonResources {
+			if !hasLegacyResourceOwner(files, owner) {
+				return nil, nil, "", invalid("unsafe archive path or metadata")
 			}
 		}
 	}

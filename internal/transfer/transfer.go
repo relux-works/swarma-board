@@ -87,6 +87,7 @@ func (c *Codec) Prepare(ctx context.Context, r io.Reader, opts contract.ImportOp
 		return empty, invalid("exactly one supported manifest required")
 	}
 	recognizedDirs := map[string]bool{}
+	legacyResources := legacy && confirmedLegacyResources(files)
 	for file := range files {
 		for dir := path.Dir(file); dir != "."; dir = path.Dir(dir) {
 			recognizedDirs[dir] = true
@@ -97,7 +98,7 @@ func (c *Codec) Prepare(ctx context.Context, r io.Reader, opts contract.ImportOp
 			return empty, invalid("unrecognized archive directory")
 		}
 		for part := range strings.SplitSeq(dir, "/") {
-			if strings.HasPrefix(part, ".") && part != ".activity" {
+			if strings.HasPrefix(part, ".") && part != ".activity" && !(part == ".resources" && legacyResources && legacyResourceDirectory(files, dir)) {
 				return empty, invalid("execution or unknown archive directory")
 			}
 		}

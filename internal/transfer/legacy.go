@@ -157,6 +157,13 @@ func prepareLegacy(ctx context.Context, files map[string][]byte, target string) 
 		activityPaths[a.Path] = true
 		consumed[a.Path] = true
 	}
+	mappedResources, err := mapLegacyResources(&s, files, byPath, consumed)
+	if err != nil {
+		return s, report, err
+	}
+	if mappedResources {
+		report.Warnings = append(report.Warnings, "Legacy file resources mapped to inert content URNs; reversible originals and payloads retained in provenance (swarma-board/legacy-resource-mapping/1).")
+	}
 	for p := range files {
 		if !consumed[p] {
 			return s, report, invalid("unrecognized legacy artifact; upstream sanitization required")
