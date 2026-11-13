@@ -112,8 +112,16 @@ func readArchive(ctx context.Context, r io.Reader) (map[string][]byte, []string,
 		isDir := hdr.Typeflag == tar.TypeDir
 		pathOnly := paxHeader != nil && len(hdr.PAXRecords) == 1 && hdr.PAXRecords["path"] == hdr.Name
 		validPath := safePath(hdr.Name, isDir)
-		if !validPath && !isDir && strings.Contains(hdr.Name, ":") {
-			if owner, _, ok := legacyResourcePath(hdr.Name); ok {
+		if !validPath && strings.Contains(hdr.Name, ":") {
+			resourceName := hdr.Name
+			if isDir {
+				if !strings.HasSuffix(resourceName, "/") {
+					resourceName = ""
+				} else {
+					resourceName = strings.TrimSuffix(resourceName, "/")
+				}
+			}
+			if owner, _, ok := legacyResourcePath(resourceName); ok {
 				validPath = true
 				colonResources[hdr.Name] = owner
 			}

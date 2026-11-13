@@ -147,7 +147,14 @@ type and ordering; its URI becomes an inert
 `provenance/resource-<digest>.bin`, and
 `provenance/legacy-resource-map-v1.json` preserves the original URI/path and
 per-element ordinal associations for reversal. Identical payloads may deduplicate.
-Mapping warnings disclose this preservation; preserved resources are not exclusions.
+Resource classification follows the validated owner `.resources/` layout, not
+payload names or contents: `README.md` at any depth there remains resource data,
+even when its bytes resemble element metadata. Its association, order and exact
+bytes are preserved. Owner-scoped resource labels may contain ordinary colons
+in regular file entries and canonical trailing-slash directory headers only
+with a closed legacy-v2 manifest and a valid element owner; those headers do not
+change resource mapping. Mapping warnings disclose this preservation; preserved
+resources are not exclusions.
 Missing or orphan payloads, ambiguous associations, traversal, links, userinfo,
 queries and fragments refuse; archive and generated-entry budgets still apply.
 Native-v1 provenance remains opaque checksummed data and grants no file access.

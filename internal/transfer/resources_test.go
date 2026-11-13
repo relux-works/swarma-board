@@ -1,7 +1,9 @@
 package transfer
 
 import (
+	"archive/tar"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
@@ -344,6 +346,209 @@ func TestGeneratedResourceMappingRetainsEntryBudget(t *testing.T) {
 			t.Fatal("generated mapping entry limit not enforced specifically", err)
 		}
 	}
+}
+
+func resourceFixtureWithPayload(t *testing.T, relative string, payload []byte) map[string][]byte {
+	t.Helper()
+	files := resourceFixture(t)
+	delete(files, resourceTaskDir+"/.resources/plain.txt")
+	files[resourceTaskDir+"/.resources/"+relative] = append([]byte(nil), payload...)
+	progressPath := resourceTaskDir + "/progress.md"
+	progress := string(files[progressPath])
+	oldReference := "file://TASK-001/plain.txt"
+	if !strings.Contains(progress, oldReference) {
+		t.Fatal("resource fixture lost its first reference")
+	}
+	files[progressPath] = []byte(strings.Replace(progress, oldReference, "file://TASK-001/"+relative, 1))
+	return files
+}
+
+func resourceEntriesForTest(t *testing.T, prepared contract.PreparedImport) []legacyResourceEntry {
+	t.Helper()
+	for _, file := range prepared.Snapshot.Provenance {
+		if file.Path == resourceMapPath {
+			var mapping legacyResourceMap
+			if err := json.Unmarshal(file.Data, &mapping); err != nil {
+				t.Fatal(err)
+			}
+			return mapping.Entries
+		}
+	}
+	t.Fatal("legacy resource map is missing")
+	return nil
+}
+
+// This synthetic archive keeps owner-contained README payloads and their ordinal; filename and content do not create elements.
+func TestLegacyResourceREADMEIsPayload(t *testing.T) {
+	metadataLookingPayload := []byte("# TASK-999_fake_readme\n\n## Description\nResource bytes.\n\n## Scope\nFixture payload.\n\n## Acceptance Criteria\nPreserve these exact bytes.\n")
+	baseline := mustPrepare(t, fixture(t, "legacy-v2"))
+	for _, relative := range []string{"README.md", "docs/README.md", "TASK-999_fake/README.md", "readme.txt"} {
+		t.Run(relative, func(t *testing.T) {
+			prepared := mustPrepare(t, pack(t, resourceFixtureWithPayload(t, relative, metadataLookingPayload)))
+			if len(prepared.Snapshot.Elements) != len(baseline.Snapshot.Elements) {
+				t.Fatalf("resource created or removed an element: got %d want %d", len(prepared.Snapshot.Elements), len(baseline.Snapshot.Elements))
+			}
+			for i := range baseline.Snapshot.Elements {
+				if prepared.Snapshot.Elements[i].ID != baseline.Snapshot.Elements[i].ID {
+					t.Fatalf("element order or identity changed at %d: got %s want %s", i, prepared.Snapshot.Elements[i].ID, baseline.Snapshot.Elements[i].ID)
+				}
+			}
+			entries := resourceEntriesForTest(t, prepared)
+			if len(entries) != 2 {
+				t.Fatalf("resource count changed: got %d want 2", len(entries))
+			}
+			first := entries[0]
+			if first.ElementID != "TASK-001" || first.ResourceOrdinal != 0 || first.OriginalURI != "file://TASK-001/"+relative || first.OriginalPath != resourceTaskDir+"/.resources/"+relative || first.Bytes != int64(len(metadataLookingPayload)) {
+				t.Fatalf("README resource association changed: %+v", first)
+			}
+			second := entries[1]
+			if second.ElementID != "TASK-001" || second.ResourceOrdinal != 1 || second.OriginalURI != "file://TASK-001/release:notes.txt" {
+				t.Fatalf("neighboring resource order changed: %+v", second)
+			}
+			wantPayloadPath := "provenance/resource-" + digestBytes(metadataLookingPayload) + ".bin"
+			foundPayload := false
+			for _, file := range prepared.Snapshot.Provenance {
+				if file.Path == wantPayloadPath && bytes.Equal(file.Data, metadataLookingPayload) {
+					foundPayload = true
+				}
+			}
+			if !foundPayload {
+				t.Fatal("resource payload bytes changed or were dropped")
+			}
+		})
+	}
+}
+
+func packWithDirectoryHeaders(t *testing.T, files map[string][]byte, directories []string, directoriesFirst bool) []byte {
+	t.Helper()
+	var archive bytes.Buffer
+	gz := gzip.NewWriter(&archive)
+	tarWriter := tar.NewWriter(gz)
+	writeDirectories := func() {
+		t.Helper()
+		for _, name := range directories {
+			if err := tarWriter.WriteHeader(&tar.Header{Name: name, Mode: 0700, Typeflag: tar.TypeDir}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	writeFiles := func() {
+		t.Helper()
+		names := make([]string, 0, len(files))
+		for name := range files {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			data := files[name]
+			if err := tarWriter.WriteHeader(&tar.Header{Name: name, Mode: 0600, Typeflag: tar.TypeReg, Size: int64(len(data))}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tarWriter.Write(data); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if directoriesFirst {
+		writeDirectories()
+		writeFiles()
+	} else {
+		writeFiles()
+		writeDirectories()
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return archive.Bytes()
+}
+
+// The no-header archive is the control; nested owner-scoped headers keep the same resource bytes and original order.
+func TestLegacyColonResourceDirectoryHeadersPreserveMapping(t *testing.T) {
+	files := resourceFixture(t)
+	delete(files, resourceTaskDir+"/.resources/release:notes.txt")
+	resourcePath := resourceTaskDir + "/.resources/release:one/a.bin"
+	files[resourcePath] = []byte("nested colon resource\x00bytes")
+	progressPath := resourceTaskDir + "/progress.md"
+	files[progressPath] = []byte(strings.Replace(string(files[progressPath]), "file://TASK-001/release:notes.txt", "file://TASK-001/release:one/a.bin", 1))
+	baseline := mustPrepare(t, pack(t, files))
+	directories := []string{resourceTaskDir + "/.resources/", resourceTaskDir + "/.resources/release:one/"}
+	cases := []struct {
+		name             string
+		directories      []string
+		directoriesFirst bool
+	}{
+		{name: "canonical-parent-first", directories: directories, directoriesFirst: true},
+		{name: "nested-header-first", directories: []string{directories[1], directories[0]}, directoriesFirst: true},
+		{name: "headers-after-files", directories: directories, directoriesFirst: false},
+	}
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			prepared := mustPrepare(t, packWithDirectoryHeaders(t, files, testCase.directories, testCase.directoriesFirst))
+			resourceEntries := resourceEntriesForTest(t, prepared)
+			baselineEntries := resourceEntriesForTest(t, baseline)
+			resourceProvenance := func(p contract.PreparedImport) []contract.ProvenanceFile {
+				stable := make([]contract.ProvenanceFile, 0, len(p.Snapshot.Provenance))
+				for _, file := range p.Snapshot.Provenance {
+					if !strings.HasPrefix(file.Path, "provenance/transfer-") {
+						stable = append(stable, file)
+					}
+				}
+				return stable
+			}
+			if !reflect.DeepEqual(prepared.Snapshot.Elements, baseline.Snapshot.Elements) || !reflect.DeepEqual(resourceProvenance(prepared), resourceProvenance(baseline)) || !reflect.DeepEqual(resourceEntries, baselineEntries) {
+				t.Fatal("directory header order changed resource associations, payloads, or element facts")
+			}
+			if len(resourceEntries) != 2 || resourceEntries[0].ResourceOrdinal != 0 || resourceEntries[1].ResourceOrdinal != 1 || resourceEntries[1].OriginalURI != "file://TASK-001/release:one/a.bin" || resourceEntries[1].OriginalPath != resourcePath {
+				t.Fatalf("nested colon resource mapping changed: %+v", resourceEntries)
+			}
+		})
+	}
+}
+
+// Owner, format, and path refusals remain active for nearby colon-directory attacks.
+func TestLegacyColonResourceDirectoryHeadersRejectOtherNamespaces(t *testing.T) {
+	validFiles := resourceFixture(t)
+	owner := resourceTaskDir
+	for _, testCase := range []struct {
+		name      string
+		directory string
+		files     map[string][]byte
+	}{
+		{name: "outside-resources", directory: owner + "/release:one/", files: validFiles},
+		{name: "wrong-owner", directory: "EPIC-999_fake/.resources/release:one/", files: validFiles},
+		{name: "traversal", directory: owner + "/.resources/release:one/../escape/", files: validFiles},
+		{name: "drive-root", directory: "C:/" + owner + "/.resources/release:one/", files: validFiles},
+		{name: "uri-root", directory: "file://" + owner + "/.resources/release:one/", files: validFiles},
+		{name: "unc-root", directory: "//server/share/" + owner + "/.resources/release:one/", files: validFiles},
+		{name: "backslash", directory: owner + "/.resources/release:one\\/", files: validFiles},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, dirs, digest, err := readArchive(context.Background(), bytes.NewReader(packWithDirectoryHeaders(t, testCase.files, []string{testCase.directory}, true)))
+			var archiveErr *contract.Error
+			if !errors.As(err, &archiveErr) || archiveErr.Code != "invalid_snapshot" || dirs != nil || digest != "" {
+				t.Fatalf("unsafe colon directory did not refuse atomically: dirs=%v digest=%q err=%v", dirs, digest, err)
+			}
+		})
+	}
+	t.Run("native-v1", func(t *testing.T) {
+		nativeFiles := unpack(t, native(t, nil, func(manifest *nativeManifest, files map[string][]byte) {
+			files[owner+"/README.md"] = []byte("neutral owner readme")
+			files[owner+"/progress.md"] = []byte("neutral owner progress")
+			manifest.Files = append(manifest.Files,
+				fileDigest{Path: owner + "/README.md", SHA256: digestBytes(files[owner+"/README.md"])},
+				fileDigest{Path: owner + "/progress.md", SHA256: digestBytes(files[owner+"/progress.md"])},
+			)
+			sort.Slice(manifest.Files, func(i, j int) bool { return manifest.Files[i].Path < manifest.Files[j].Path })
+		}))
+		_, dirs, digest, err := readArchive(context.Background(), bytes.NewReader(packWithDirectoryHeaders(t, nativeFiles, []string{owner + "/.resources/release:one/"}, true)))
+		var archiveErr *contract.Error
+		if !errors.As(err, &archiveErr) || archiveErr.Code != "invalid_snapshot" || dirs != nil || digest != "" {
+			t.Fatalf("native-v1 accepted a legacy colon directory: dirs=%v digest=%q err=%v", dirs, digest, err)
+		}
+	})
 }
 
 func TestLegacyEncodedFragmentCharacterIsFilenameData(t *testing.T) {

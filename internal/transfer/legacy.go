@@ -37,7 +37,7 @@ func prepareLegacy(ctx context.Context, files map[string][]byte, target string) 
 	}
 	dirs := []string{}
 	for p := range files {
-		if path.Base(p) == "README.md" {
+		if path.Base(p) == "README.md" && !legacyResourceDirectory(files, path.Dir(p)) {
 			dirs = append(dirs, path.Dir(p))
 		}
 	}
