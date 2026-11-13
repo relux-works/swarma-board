@@ -85,6 +85,12 @@ func parseMarkdownDocument(content string, allowTitle bool) (*markdownDocument, 
 			}
 		case 2:
 			normalized := normalizeHeading(name)
+			// Description is a Markdown body, just like Notes below. Only
+			// README product headings delimit it; other H2 headings retain
+			// their source bytes and cannot become progress-field authority.
+			if allowTitle && len(doc.sections) > 0 && doc.sections[len(doc.sections)-1].normalized == "description" && normalized != "description" && normalized != "scope" && normalized != "acceptance criteria" {
+				continue
+			}
 			// Notes may contain hand-authored Markdown headings. Only known
 			// progress fields end that free-text field; unknown headings outside
 			// Notes still become sections and are refused by Parse.
