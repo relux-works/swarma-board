@@ -120,6 +120,12 @@ func TestLegacyResourceConstructionRefusals(t *testing.T) {
 		"query": func(f map[string][]byte) {
 			f[resourceTaskDir+"/progress.md"] = bytes.ReplaceAll(f[resourceTaskDir+"/progress.md"], []byte("file://TASK-001/plain.txt"), []byte("file://TASK-001/plain.txt?query=value"))
 		},
+		"fragment": func(f map[string][]byte) {
+			f[resourceTaskDir+"/progress.md"] = bytes.ReplaceAll(f[resourceTaskDir+"/progress.md"], []byte("file://TASK-001/plain.txt"), []byte("file://TASK-001/plain.txt#detail"))
+		},
+		"empty fragment": func(f map[string][]byte) {
+			f[resourceTaskDir+"/progress.md"] = bytes.ReplaceAll(f[resourceTaskDir+"/progress.md"], []byte("file://TASK-001/plain.txt"), []byte("file://TASK-001/plain.txt#"))
+		},
 		"userinfo": func(f map[string][]byte) {
 			f[resourceTaskDir+"/progress.md"] = bytes.ReplaceAll(f[resourceTaskDir+"/progress.md"], []byte("file://TASK-001/plain.txt"), []byte("file://label@TASK-001/plain.txt"))
 		},
@@ -337,5 +343,37 @@ func TestGeneratedResourceMappingRetainsEntryBudget(t *testing.T) {
 		if !errors.As(err, &ce) || ce.Code != "invalid_snapshot" || ce.Message != "legacy resource mapping size limit" || !reflect.DeepEqual(p, contract.PreparedImport{}) {
 			t.Fatal("generated mapping entry limit not enforced specifically", err)
 		}
+	}
+}
+
+func TestLegacyEncodedFragmentCharacterIsFilenameData(t *testing.T) {
+	// Encoded # belongs to a literal archive filename, unlike an actual empty/nonempty URI fragment; preserve the exact source URI.
+	f := resourceFixture(t)
+	data := f[resourceTaskDir+"/.resources/plain.txt"]
+	delete(f, resourceTaskDir+"/.resources/plain.txt")
+	f[resourceTaskDir+"/.resources/literal#mark.txt"] = data
+	f[resourceTaskDir+"/progress.md"] = bytes.ReplaceAll(f[resourceTaskDir+"/progress.md"], []byte("file://TASK-001/plain.txt"), []byte("file://TASK-001/literal%23mark.txt"))
+	p := mustPrepare(t, pack(t, f))
+	found := false
+	for _, v := range p.Snapshot.Provenance {
+		if v.Path == "provenance/legacy-resource-map-v1.json" {
+			var m struct {
+				Entries []struct {
+					URI  string `json:"original_uri"`
+					Path string `json:"original_path"`
+				} `json:"entries"`
+			}
+			if json.Unmarshal(v.Data, &m) != nil {
+				t.Fatal("mapping decode")
+			}
+			for _, e := range m.Entries {
+				if e.URI == "file://TASK-001/literal%23mark.txt" && e.Path == resourceTaskDir+"/.resources/literal#mark.txt" {
+					found = true
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatal("encoded filename character/URI changed")
 	}
 }

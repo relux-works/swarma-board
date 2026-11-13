@@ -72,7 +72,7 @@ func legacyResourceDirectory(files map[string][]byte, dir string) bool {
 
 func legacyResourceReference(uri, id, owner string) (string, error) {
 	u, err := url.Parse(uri)
-	if err != nil || u.Scheme != "file" || u.Host != id || u.User != nil || u.Opaque != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(uri, "\x00\r\n\t") || !strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//") {
+	if err != nil || u.Scheme != "file" || u.Host != id || u.User != nil || u.Opaque != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.ContainsAny(uri, "?#\x00\r\n\t") || !strings.HasPrefix(u.Path, "/") || strings.HasPrefix(u.Path, "//") {
 		return "", invalid("invalid legacy file resource reference")
 	}
 	// Decode once via url.Parse. Encoded path separators cannot acquire new
