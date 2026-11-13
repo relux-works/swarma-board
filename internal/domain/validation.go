@@ -140,7 +140,7 @@ func validateElements(elements []contract.Element) error {
 		if query.Leaf(e.Type) && statusGuarded(e.Status) && b.Blocked(e) {
 			return errCode("blocked", "Active or missing blocker")
 		}
-		if query.Contains([]string{"development", "to-review"}, e.Status) && strings.TrimSpace(e.AssignedTo) == "" {
+		if query.Leaf(e.Type) && query.Contains([]string{"development", "to-review"}, e.Status) && strings.TrimSpace(e.AssignedTo) == "" {
 			return errCode("not_assigned", "Assignee required")
 		}
 		if !query.Terminal(e.Status) {
