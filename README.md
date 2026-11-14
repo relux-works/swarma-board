@@ -244,4 +244,6 @@ parallelism is limited to one and in-package test parallelism to two, with two
 Go scheduler threads. Each lane reports even when another lane fails, and a
 final summary fails the job if any lane fails. Each race lane gets a separate
 private provider evidence directory under the runner temporary path; evidence
-and reports are not uploaded.
+and reports are not uploaded. The Actions job log and `GITHUB_STEP_SUMMARY`
+contain the lane results. The workflow file is the exact command and ordering
+reference for local reproduction.
