@@ -1,0 +1,199 @@
+name: CI
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  go-ci:
+    name: Go checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      CGO_ENABLED: '1'
+      GOMAXPROCS: '2'
+    steps:
+      - name: Check out source
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go 1.26.10
+        id: setup-go
+        if: ${{ always() }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.10'
+          check-latest: false
+          cache: false
+
+      - name: Prepare private provider test evidence
+        id: prepare-evidence
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup-go.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHECKOUT_OUTCOME" != success || "$GO_SETUP_OUTCOME" != success ]]; then
+            echo 'Provider evidence setup blocked because checkout or Go setup failed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          root_evidence_dir="$(mktemp -d "$RUNNER_TEMP/providerdb-root-evidence.XXXXXX")"
+          dataprovider_evidence_dir="$(mktemp -d "$RUNNER_TEMP/providerdb-dataprovider-evidence.XXXXXX")"
+          printf 'root_evidence=%s\n' "$root_evidence_dir" >> "$GITHUB_OUTPUT"
+          printf 'root_report=%s/provider-report.json\n' "$root_evidence_dir" >> "$GITHUB_OUTPUT"
+          printf 'dataprovider_evidence=%s\n' "$dataprovider_evidence_dir" >> "$GITHUB_OUTPUT"
+          printf 'dataprovider_report=%s/provider-report.json\n' "$dataprovider_evidence_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Build root module
+        id: build-root
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup-go.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHECKOUT_OUTCOME" != success || "$GO_SETUP_OUTCOME" != success ]]; then
+            echo 'Lane blocked: checkout or Go setup failed.'
+            exit 1
+          fi
+          go build -mod=readonly -p=1 ./...
+
+      - name: Build dataprovider module
+        id: build-dataprovider
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup-go.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHECKOUT_OUTCOME" != success || "$GO_SETUP_OUTCOME" != success ]]; then
+            echo 'Lane blocked: checkout or Go setup failed.'
+            exit 1
+          fi
+          cd modules/dataprovider
+          go build -mod=readonly -p=1 ./...
+
+      - name: Vet root module
+        id: vet-root
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup-go.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHECKOUT_OUTCOME" != success || "$GO_SETUP_OUTCOME" != success ]]; then
+            echo 'Lane blocked: checkout or Go setup failed.'
+            exit 1
+          fi
+          go vet -mod=readonly -p=1 ./...
+
+      - name: Vet dataprovider module
+        id: vet-dataprovider
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup-go.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHECKOUT_OUTCOME" != success || "$GO_SETUP_OUTCOME" != success ]]; then
+            echo 'Lane blocked: checkout or Go setup failed.'
+            exit 1
+          fi
+          cd modules/dataprovider
+          go vet -mod=readonly -p=1 ./...
+
+      - name: Check gofmt without modifying source
+        id: gofmt
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup-go.outcome }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHECKOUT_OUTCOME" != success || "$GO_SETUP_OUTCOME" != success ]]; then
+            echo 'Lane blocked: checkout or Go setup failed.'
+            exit 1
+          fi
+          formatted_list="$(mktemp "$RUNNER_TEMP/gofmt-list.XXXXXX")"
+          git ls-files -z -- '*.go' |
+            xargs -0 -r -n1 sh -c 'gofmt -l "./$1"' sh > "$formatted_list"
+          if [[ -s "$formatted_list" ]]; then
+            cat "$formatted_list"
+            echo 'gofmt found files that need formatting.'
+            exit 1
+          fi
+
+      - name: Race test root module
+        id: race-root
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup-go.outcome }}
+          EVIDENCE_OUTCOME: ${{ steps.prepare-evidence.outcome }}
+          PROVIDERDB_EVIDENCE: ${{ steps.prepare-evidence.outputs.root_evidence }}
+          PROVIDERDB_REPORT: ${{ steps.prepare-evidence.outputs.root_report }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHECKOUT_OUTCOME" != success || "$GO_SETUP_OUTCOME" != success || "$EVIDENCE_OUTCOME" != success ]]; then
+            echo 'Lane blocked: checkout, Go setup, or provider evidence setup failed.'
+            exit 1
+          fi
+          go test -mod=readonly -race -p=1 -parallel=2 -timeout=45m ./...
+
+      - name: Race test dataprovider module
+        id: race-dataprovider
+        if: ${{ always() }}
+        env:
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          GO_SETUP_OUTCOME: ${{ steps.setup-go.outcome }}
+          EVIDENCE_OUTCOME: ${{ steps.prepare-evidence.outcome }}
+          PROVIDERDB_EVIDENCE: ${{ steps.prepare-evidence.outputs.dataprovider_evidence }}
+          PROVIDERDB_REPORT: ${{ steps.prepare-evidence.outputs.dataprovider_report }}
+        run: |
+          set -euo pipefail
+          if [[ "$CHECKOUT_OUTCOME" != success || "$GO_SETUP_OUTCOME" != success || "$EVIDENCE_OUTCOME" != success ]]; then
+            echo 'Lane blocked: checkout, Go setup, or provider evidence setup failed.'
+            exit 1
+          fi
+          cd modules/dataprovider
+          go test -mod=readonly -race -p=1 -parallel=2 -timeout=45m ./...
+
+      - name: Report all lane results
+        if: ${{ always() }}
+        env:
+          PREPARE: ${{ steps.prepare-evidence.outcome }}
+          BUILD_ROOT: ${{ steps.build-root.outcome }}
+          BUILD_DATAPROVIDER: ${{ steps.build-dataprovider.outcome }}
+          VET_ROOT: ${{ steps.vet-root.outcome }}
+          VET_DATAPROVIDER: ${{ steps.vet-dataprovider.outcome }}
+          GOFMT: ${{ steps.gofmt.outcome }}
+          RACE_ROOT: ${{ steps.race-root.outcome }}
+          RACE_DATAPROVIDER: ${{ steps.race-dataprovider.outcome }}
+        run: |
+          set -euo pipefail
+          {
+            echo '| Lane | Result |'
+            echo '| --- | --- |'
+            echo "| Provider evidence setup | $PREPARE |"
+            echo "| Build root module | $BUILD_ROOT |"
+            echo "| Build dataprovider module | $BUILD_DATAPROVIDER |"
+            echo "| Vet root module | $VET_ROOT |"
+            echo "| Vet dataprovider module | $VET_DATAPROVIDER |"
+            echo "| Read-only gofmt | $GOFMT |"
+            echo "| Race root module | $RACE_ROOT |"
+            echo "| Race dataprovider module | $RACE_DATAPROVIDER |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          for result in "$PREPARE" "$BUILD_ROOT" "$BUILD_DATAPROVIDER" "$VET_ROOT" "$VET_DATAPROVIDER" "$GOFMT" "$RACE_ROOT" "$RACE_DATAPROVIDER"; do
+            if [[ "$result" != success ]]; then
+              exit 1
+            fi
+          done
