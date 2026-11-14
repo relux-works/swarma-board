@@ -233,3 +233,15 @@ for command selection, planning and recovery. A managed profile should declare
 the repository's `agents/skills/swarma-board` directory through its supported
 profile mechanism. The skill does not discover a connection, launch a service,
 grant access or authorize an import. No global installation is required here.
+
+## GitHub Actions CI
+
+The `.github/workflows/ci.yml` workflow runs on pull request open, reopen, and
+new commits. It uses GitHub-hosted Ubuntu 24.04 and Go 1.26.10. Root and nested
+`modules/dataprovider` modules each run build, vet, and the full race suite;
+the workflow also checks tracked Go files with read-only `gofmt -l`. Go package
+parallelism is limited to one and in-package test parallelism to two, with two
+Go scheduler threads. Each lane reports even when another lane fails, and a
+final summary fails the job if any lane fails. Each race lane gets a separate
+private provider evidence directory under the runner temporary path; evidence
+and reports are not uploaded.
