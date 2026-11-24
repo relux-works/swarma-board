@@ -6,13 +6,14 @@ Swarma Board stores task records, dependencies, plans, and snapshots behind a se
 
 ## Where things are
 
-`main` is `6263cdaf` (2026-11-13). It contains the service and CLI, task/query/transfer logic, the scoped data-provider module, filesystem and database implementation candidates, and the legacy resource import fix. The current visible work line is [`ci/pr-workflow`](https://github.com/relux-works/swarma-board/tree/ci/pr-workflow), the only branch with an open PR. It adds pull-request checks and documents their results.
+`main` is `6263cdaf` (2026-11-13). It contains the service and CLI, task/query/transfer logic, the scoped data-provider module, filesystem and database implementation candidates, and the legacy resource import fix. The two open pull requests are [#20](https://github.com/relux-works/swarma-board/pull/20), on branch [`ci/pr-workflow`](https://github.com/relux-works/swarma-board/tree/ci/pr-workflow), which adds pull-request checks, and [#21](https://github.com/relux-works/swarma-board/pull/21), on branch [`docs/handoff`](https://github.com/relux-works/swarma-board/tree/docs/handoff), which carries this handoff.
 
 Work done after 2026-11-14 that was never pushed is not in this repository. When it is pushed, it goes to its own branch, and this table gets a row for it.
 
 | Branch | State | What is missing |
 | --- | --- | --- |
-| `ci/pr-workflow` | PR #20 open; Nov 14 hosted check failed in the root-race lane | Resolve the root race-suite timeout at C19, then get a green hosted run. The PR reports that its nested module race suite passed locally. |
+| `ci/pr-workflow` | PR #20 open; hosted root-race check failed | Investigate the local C19 `metadataBoundsCase` timeout and hosted C41 `checkpoint-missing` timeout separately; then get a green hosted run. The PR reports its nested module race suite passed locally. |
+| `docs/handoff` | PR #21 open (draft) | This documentation handoff is awaiting review. |
 | `main` | Current product baseline | Wire the storage interface into the service, finish filesystem/database conformance, and complete the separate deployment and durability gates. |
 
 The closed `docs/task-261107-cpd6wt-provider-no-migration-425`, `feat/dataprovider-db`, and `feat/dataprovider-filesystem` branches are superseded by later merged revisions: PRs #7, #12, and #11 respectively. They are not continuation lines.
@@ -34,7 +35,7 @@ The closed `docs/task-261107-cpd6wt-provider-no-migration-425`, `feat/dataprovid
 
 ## Build and test
 
-The repository requires Go 1.25.5 or newer. This Mac has Go 1.25.14 (`darwin/arm64`). Run from the repository root.
+The repository requires Go 1.25.5 or newer. This Mac has Go 1.25.14 (`darwin/arm64`). Run from the repository root. See [Prepare the local service](README.md#prepare-the-local-service) for setup and launch instructions and the Linux runtime limit.
 
 ```sh
 build_dir="$(mktemp -d)"
@@ -53,10 +54,10 @@ The full root command `go test ./... -timeout=45m` did not complete on macOS. Th
 
 ## Next steps
 
-1. Resolve the root race-suite C19 `metadataBoundsCase` timeout without weakening its contract, then get PR #20's hosted check green.
+1. Investigate the root-race reports separately without weakening their cases: PR #20's description reports a local timeout at C19 `metadataBoundsCase`; the hosted root race timed out after 45 minutes while executing C41 `checkpoint-missing`, and the overall hosted check failed after 1h30m24s. Then rerun the hosted checks and confirm green.
 2. Confirm and accept the data-provider contract revision before extending its current candidate implementations.
 3. Wire explicit scoped storage selection into the service and client while keeping the existing store behavior and migration out of scope.
 4. Run the complete filesystem and database conformance matrices, compare their exact observable results, and report remaining `NOT_VERIFIED` cases.
 5. Complete native durability, production-admission, and activation gates separately; source tests alone do not close them.
 
-Remote state was checked on 2026-11-24 at `6263cdaf`.
+Remote state was checked on 2026-11-24: `main` at `6263cdaf`; PR #20 and #21 were open.
